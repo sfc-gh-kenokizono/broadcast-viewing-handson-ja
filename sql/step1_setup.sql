@@ -279,7 +279,7 @@ UNION ALL SELECT 'STREAMING_AD_LOG',   COUNT(*) FROM STREAMING_AD_LOG
 UNION ALL SELECT 'PANEL_DEMOGRAPHICS', COUNT(*) FROM PANEL_DEMOGRAPHICS
 ORDER BY TABLE_NAME;
 
--- 視聴区間の合計は 500,650 行になります。
+-- 視聴区間の合計は 500,648 行になります。局ごとに行数が違うのは、局の規模の差を表しているためです。
 
 -- -----------------------------------------------------------------------------
 -- 生データをそのまま使うと困ることの確認

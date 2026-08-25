@@ -43,15 +43,21 @@ NETWORKS = [
     ("NW05", "第五放送ネットワーク", "081"),
 ]
 
+# 局ごとの規模の差。合計が 1 になるように配分する。
+# ここを均等にすると 5 局のリーチがほぼ横一線になり、局別のグラフが意味を持たない。
+NETWORK_SHARE = {"NW01": 0.27, "NW02": 0.23, "NW03": 0.20, "NW04": 0.17, "NW05": 0.13}
+
 GENRES = ["ドラマ", "バラエティ", "アニメ", "ニュース", "スポーツ", "音楽", "映画", "情報"]
 
 # 時間帯ごとの視聴の出やすさ。ゴールデンに寄せる。
+# 深夜は 0 時台として扱う。24 時台にすると放送日と暦の日付がずれ、
+# その曜日に深夜番組しかない局の日が空になってしまう。
 TIME_SLOTS = {
     "朝":       {"hour": 7,  "weight": 12},
     "昼":       {"hour": 12, "weight": 8},
     "夕方":     {"hour": 17, "weight": 10},
     "ゴールデン": {"hour": 20, "weight": 40},
-    "深夜":     {"hour": 24, "weight": 6},
+    "深夜":     {"hour": 0,  "weight": 6},
 }
 
 SEGMENTS = ["T", "F1", "F2", "F3", "M1", "M2", "M3"]
@@ -297,6 +303,11 @@ def build_devices(rng: random.Random, n_devices: int, n_ips: int):
         ip = slots[i]
         # 視聴の多い家と少ない家の差を付ける。1 に近いほどよく見る。
         activity = rng.betavariate(2.0, 3.0) * 0.9 + 0.1
+        # 配信を見るかどうかを activity と逆相関にする。
+        # テレビをあまり見ない層が配信で見ているという想定。
+        # ここを独立にすると、配信で接触する人がすでに放送でも接触済みになり、
+        # 増分リーチがほぼゼロになって指標として意味をなさない。
+        streaming = rng.random() < (0.85 - 0.7 * activity)
         # よく見る局の順位を受信機ごとにシャッフルして重みを割り当てる
         order = network_ids[:]
         rng.shuffle(order)
@@ -307,7 +318,7 @@ def build_devices(rng: random.Random, n_devices: int, n_ips: int):
             "postal_code": ip_postal[ip],
             "activity": activity,
             "segment": None,          # あとでパネル分だけ埋める
-            "streaming": rng.random() < 0.45,
+            "streaming": streaming,
             "nw_affinity": dict(zip(order, weights)),
         })
     return devices, ip_postal
@@ -327,7 +338,12 @@ def build_programs(rng: random.Random):
             "time_slot": slot,
             "duration_min": duration,
             "synopsis": synopsis,
-            "day_of_week": idx % 7,   # 0 = 月曜
+            # 曜日は局ごとに 0 から 6 をすべて埋める。
+            # idx % 7 にすると局と曜日の組み合わせに穴ができ、
+            # 「ある局のある曜日には番組がない」＝その日の行が 0 件になる。
+            # 意図した欠落（NW03 の 1 日）と区別できなくなるので、
+            # 局のなかで曜日を順に割り当てる。
+            "day_of_week": (idx // len(NETWORKS)) % 7,
         })
     return programs
 
@@ -341,10 +357,7 @@ def build_schedule(programs):
         for d in dates_in_period():
             if d.weekday() != p["day_of_week"]:
                 continue
-            # 深夜枠は 24 時台なので翌日の 0 時台として扱う
-            start = datetime(d.year, d.month, d.day, base_hour % 24, minute)
-            if base_hour >= 24:
-                start += timedelta(days=1)
+            start = datetime(d.year, d.month, d.day, base_hour, minute)
             rows.append({
                 "program_id": p["program_id"],
                 "network_id": p["network_id"],
@@ -398,11 +411,12 @@ def genre_affinity(dev, genre: str) -> float:
     return value
 
 
-def build_viewing_logs(rng: random.Random, devices, schedule, per_network: int):
+def build_viewing_logs(rng: random.Random, devices, schedule, total_rows: int):
     """局ごとの視聴区間を作る。
 
     放送枠に紐づけて発生させる。そうしないと番組別の集計が意味を持たない。
     区間の長さは短いものが多く長いものが少ない分布にし、平均を 12 分前後にする。
+    局ごとの行数は NETWORK_SHARE で配分し、規模の差を作る。
     """
     by_network = {nw[0]: [] for nw in NETWORKS}
     sched_by_network = {nw[0]: [] for nw in NETWORKS}
@@ -415,6 +429,7 @@ def build_viewing_logs(rng: random.Random, devices, schedule, per_network: int):
     duration_weights = [18, 20, 14, 14, 12, 10, 7, 5]
 
     for network_id, slots in sched_by_network.items():
+        per_network = int(total_rows * NETWORK_SHARE[network_id])
         # この局に届かない日の枠は最初から除いておく
         usable = [s for s in slots
                   if not (network_id == MISSING_NETWORK and s["air_date"] == MISSING_DAY)]
@@ -455,20 +470,20 @@ def inject_anomalies(rng: random.Random, by_network):
     counts = {"reversed": 0, "too_long": 0, "duplicated": 0}
     for network_id, rows in by_network.items():
         # 終了時刻が開始時刻より前
-        for _ in range(40):
+        for _ in range(int(40 * NETWORK_SHARE[network_id] * 5)):
             src = list(rng.choice(rows))
             src[6], src[7] = src[7], src[6]
             rows.append(src)
             counts["reversed"] += 1
         # 視聴時間が 24 時間を超える
-        for _ in range(30):
+        for _ in range(int(30 * NETWORK_SHARE[network_id] * 5)):
             src = list(rng.choice(rows))
             start = datetime.strptime(src[6], "%Y-%m-%d %H:%M:%S")
             src[7] = (start + timedelta(hours=rng.randint(25, 40))).strftime("%Y-%m-%d %H:%M:%S")
             rows.append(src)
             counts["too_long"] += 1
         # 完全に重複した行
-        for _ in range(60):
+        for _ in range(int(60 * NETWORK_SHARE[network_id] * 5)):
             rows.append(list(rng.choice(rows)))
             counts["duplicated"] += 1
         rng.shuffle(rows)
@@ -511,11 +526,13 @@ def build_streaming(rng: random.Random, devices, programs, n_logs: int):
     return rows
 
 
-def build_cm(rng: random.Random, schedule):
+def build_cm(rng: random.Random, schedule, n_spots: int):
     """コマーシャルのマスタと放送実績。
 
-    CM0001 を主役の出稿として本数を多めにする。フリークエンシーの分布が
-    意味のある形になるようにするため。
+    スポット本数を増やしすぎると、放送だけでほぼ全部の受信機に届いてしまい、
+    配信を追加しても増える余地がなくなる。増分リーチが指標として意味を持つよう、
+    1 つのコマーシャルあたりの本数を押さえてある。
+    CM0001 だけは本数を多めにして、フリークエンシーの分布に差を作る。
     """
     master = []
     for idx, (category, advertiser, desc) in enumerate(ADVERTISERS):
@@ -528,13 +545,27 @@ def build_cm(rng: random.Random, schedule):
         ])
 
     cm_ids = [f"CM{i + 1:04d}" for i in range(len(ADVERTISERS))]
-    cm_weights = [400 if i == 0 else 84 for i in range(len(ADVERTISERS))]
-    slot_weights = [TIME_SLOTS[s["time_slot"]]["weight"] for s in schedule]
+    cm_weights = [90 if i == 0 else 30 for i in range(len(ADVERTISERS))]
 
-    picked_slots = rng.choices(schedule, weights=slot_weights, k=2000)
-    picked_cms = rng.choices(cm_ids, weights=cm_weights, k=2000)
+    # 実際の出稿は「この局のこの時間帯の枠を買う」形になる。
+    # 全局・全時間帯にばらまくと放送だけでほぼ全部の受信機に届いてしまい、
+    # 配信を追加しても増える余地がなくなる。
+    slot_names = ["ゴールデン", "夕方", "深夜", "朝", "昼"]
+    network_ids = [n[0] for n in NETWORKS]
+    cm_target = {
+        cm: (network_ids[i % len(network_ids)], slot_names[(i // len(network_ids)) % len(slot_names)])
+        for i, cm in enumerate(cm_ids)
+    }
+
+    by_target = {}
+    for s in schedule:
+        by_target.setdefault((s["network_id"], s["time_slot"]), []).append(s)
+
+    picked_cms = rng.choices(cm_ids, weights=cm_weights, k=n_spots)
     spots = []
-    for i, (slot, cm_id) in enumerate(zip(picked_slots, picked_cms)):
+    for i, cm_id in enumerate(picked_cms):
+        candidates = by_target.get(cm_target[cm_id]) or schedule
+        slot = rng.choice(candidates)
         span_min = int((slot["air_to"] - slot["air_from"]).total_seconds() // 60)
         air_at = slot["air_from"] + timedelta(minutes=rng.randint(0, max(0, span_min - 1)))
         spots.append([
@@ -549,7 +580,7 @@ def build_cm(rng: random.Random, schedule):
 def build_streaming_ads(rng: random.Random, devices, n_imps: int):
     pool = [d for d in devices if d["streaming"]]
     cm_ids = [f"CM{i + 1:04d}" for i in range(len(ADVERTISERS))]
-    cm_weights = [400 if i == 0 else 84 for i in range(len(ADVERTISERS))]
+    cm_weights = [90 if i == 0 else 30 for i in range(len(ADVERTISERS))]
     dev_types = [t for t, _ in DEVICE_TYPES]
     dev_type_weights = [w for _, w in DEVICE_TYPES]
 
@@ -576,9 +607,11 @@ def main():
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--devices", type=int, default=20000, help="共通 ID の数")
     parser.add_argument("--ips", type=int, default=12000, help="IP アドレスの数")
-    parser.add_argument("--viewing-per-network", type=int, default=100000)
+    parser.add_argument("--viewing-total", type=int, default=500000,
+                        help="視聴区間の合計行数。局ごとの配分は NETWORK_SHARE に従う")
     parser.add_argument("--streaming-logs", type=int, default=80000)
     parser.add_argument("--streaming-ads", type=int, default=30000)
+    parser.add_argument("--cm-spots", type=int, default=500)
     parser.add_argument("--panel", type=int, default=2000)
     parser.add_argument("--no-compress", action="store_true")
     args = parser.parse_args()
@@ -592,10 +625,10 @@ def main():
     programs = build_programs(rng)
     schedule = build_schedule(programs)
     panel_rows = assign_panel(rng, devices, args.panel)
-    viewing = build_viewing_logs(rng, devices, schedule, args.viewing_per_network)
+    viewing = build_viewing_logs(rng, devices, schedule, args.viewing_total)
     anomaly_counts = inject_anomalies(rng, viewing)
     streaming = build_streaming(rng, devices, programs, args.streaming_logs)
-    cm_master, cm_spots = build_cm(rng, schedule)
+    cm_master, cm_spots = build_cm(rng, schedule, args.cm_spots)
     streaming_ads = build_streaming_ads(rng, devices, args.streaming_ads)
 
     print("\n書き出しています ...")

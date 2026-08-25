@@ -21,11 +21,38 @@
 | `BCAST_ENGINEER` | `RAW` / `STG` / `INT` / `MART` すべて |
 | `BCAST_ANALYST` | `MART` だけ |
 
-`BCAST_ANALYST` に切り替えて確かめます。
+### 先に副ロールを切っておく
+
+ここで 1 つ大事な前置きがあります。
+
+Snowflake のユーザーには**副ロール**という設定があり、既定では使えるロールすべてが副ロールとして有効になっています。この状態だと `USE ROLE` でロールを切り替えても、元のロールの権限がセッションに残ります。つまり `ACCOUNTADMIN` を持っている人が `BCAST_ANALYST` に切り替えても、生データが見えたままになります。
+
+自分の設定を確認します。
+
+```sql
+USE ROLE ACCOUNTADMIN;
+SET my_user = (SELECT CURRENT_USER());
+SHOW USERS;
+SELECT "name", "default_secondary_roles"
+FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "name" = $my_user;
+```
+
+`["ALL"]` と表示されたら、すべてのロールが副ロールとして有効です。権限の効き方を確かめるときは、副ロールを切ってください。
 
 ```sql
 USE ROLE BCAST_ANALYST;
+USE SECONDARY ROLES NONE;
 
+SELECT CURRENT_ROLE() AS "主ロール", CURRENT_SECONDARY_ROLES() AS "副ロール";
+```
+
+副ロールが空になっていれば、以降の確認が意図どおりに動きます。
+
+これは実務でも引っかかるところです。ポリシーを当てたのに効いていないように見えるとき、実際には副ロールの権限で見えているだけ、ということがよくあります。
+
+### 確かめる
+
+```sql
 -- 集計データは見られる
 SELECT COUNT(*) FROM BCAST_VIEWING_HANDSON.MART.MART_DEVICE_DAILY;
 
@@ -148,6 +175,8 @@ USE ROLE BCAST_NW01_VIEWER;  -- 1 局だけ
 
 ## 覚えておきたいこと
 
+### ポリシーはテーブルを作り直すと外れる
+
 マスキングポリシーと行アクセスポリシーは、列やテーブルに紐づいています。**テーブルを作り直すと外れます。**
 
 ふだんの `dbt run` はテーブルの中身を入れ替えるだけなので残りますが、`dbt run --full-refresh` のようにテーブルそのものを作り直すと外れます。
@@ -163,6 +192,16 @@ models:
 ```
 
 ここを忘れると、パイプラインを直したつもりで伏せ字が外れているという事故につながります。ポリシーを当てたら、当て直しの処理も同時に用意しておくのが安全です。
+
+### 副ロールを切らないと効いていないように見える
+
+上でも触れましたが、実務で最も引っかかるのがここです。既定では使えるロールすべてが副ロールとして有効なので、`USE ROLE` で切り替えても前の権限が残ります。
+
+ポリシーを当てたのに効かない、と思ったときは次の順で確認してください。
+
+1. `CURRENT_SECONDARY_ROLES()` で副ロールが空かどうか
+2. `POLICY_REFERENCES` でポリシーが目的の列に当たっているか
+3. ポリシーの条件式（`IS_ROLE_IN_SESSION` は副ロールも含めて判定します）
 
 ## ハンズオンはここまでです
 

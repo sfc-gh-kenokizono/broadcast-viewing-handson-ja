@@ -179,11 +179,20 @@ GRANT USAGE ON AGENT BCAST_VIEWING_HANDSON.MART.BCAST_VIEWING_AGENT TO ROLE BCAS
 -- 設定されていないと、画面のロールを切り替えても動きません。
 --
 -- 自分の設定を確認する
-SHOW PARAMETERS LIKE 'DEFAULT%' FOR USER IDENTIFIER(CURRENT_USER());
+-- 既定のロールと既定のウェアハウスはユーザーの属性なので、
+-- SHOW USERS の結果から自分の行を取り出して見ます。
+SET my_user = (SELECT CURRENT_USER());
+SHOW USERS;
+SELECT
+  "name"              AS "ユーザー",
+  "default_role"      AS "既定のロール",
+  "default_warehouse" AS "既定のウェアハウス"
+FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))
+WHERE "name" = $my_user;
 
--- 設定されていない場合は次のように指定します。
--- ALTER USER IDENTIFIER(CURRENT_USER()) SET DEFAULT_ROLE = 'BCAST_ENGINEER';
--- ALTER USER IDENTIFIER(CURRENT_USER()) SET DEFAULT_WAREHOUSE = 'BCAST_HANDSON_WH';
+-- 空になっている場合は次のように指定します。
+-- ALTER USER IDENTIFIER($my_user) SET DEFAULT_ROLE = 'BCAST_ENGINEER';
+-- ALTER USER IDENTIFIER($my_user) SET DEFAULT_WAREHOUSE = 'BCAST_HANDSON_WH';
 
 -- =============================================================================
 -- 3. CoWork の一覧に出るかどうかを確認する

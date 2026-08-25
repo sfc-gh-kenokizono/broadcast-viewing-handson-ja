@@ -168,7 +168,7 @@ CREATE OR REPLACE SEMANTIC VIEW SV_BROADCAST_VIEWING
     device_daily.total_minutes AS SUM(device_daily.minutes)
       WITH SYNONYMS = ('総視聴時間', '視聴分数の合計')
       COMMENT = '視聴した分数の合計',
-    minutes_per_device AS DIV0(device_daily.total_minutes, device_daily.reach_devices)
+    minutes_per_device AS ROUND(DIV0(device_daily.total_minutes, device_daily.reach_devices), 1)
       WITH SYNONYMS = ('1台あたりの視聴時間', '平均視聴時間')
       COMMENT = '1 台あたりの平均視聴分数',
 
@@ -179,7 +179,7 @@ CREATE OR REPLACE SEMANTIC VIEW SV_BROADCAST_VIEWING
     program_viewing.program_reach_households AS COUNT(DISTINCT program_viewing.IP_ADDRESS)
       WITH SYNONYMS = ('番組視聴世帯数')
       COMMENT = 'その番組を視聴した世帯の数',
-    program_viewing.estimated_viewers AS COUNT(DISTINCT program_viewing.IP_ADDRESS) * 2.2
+    program_viewing.estimated_viewers AS ROUND(COUNT(DISTINCT program_viewing.IP_ADDRESS) * 2.2, 1)
       WITH SYNONYMS = ('推計視聴人数', '視聴人数')
       COMMENT = '視聴世帯数に 1 世帯あたりの想定人数 2.2 を掛けた便宜的な値。世帯人数のデータがないため固定の係数を使っている',
     program_viewing.program_total_minutes AS SUM(program_viewing.program_minutes)
@@ -196,7 +196,7 @@ CREATE OR REPLACE SEMANTIC VIEW SV_BROADCAST_VIEWING
     ad_contact.total_contacts AS SUM(ad_contact.contacts)
       WITH SYNONYMS = ('総接触回数', '延べ接触回数')
       COMMENT = '接触回数の合計',
-    avg_frequency AS DIV0(ad_contact.total_contacts, ad_contact.contact_reach)
+    avg_frequency AS ROUND(DIV0(ad_contact.total_contacts, ad_contact.contact_reach), 2)
       WITH SYNONYMS = ('フリークエンシー', '平均接触回数', '同じ人に何回見せたか')
       COMMENT = '1 台あたりの平均接触回数',
 
@@ -216,7 +216,7 @@ CREATE OR REPLACE SEMANTIC VIEW SV_BROADCAST_VIEWING
     campaign.incremental_reach AS SUM(campaign.INCREMENTAL_REACH)
       WITH SYNONYMS = ('増分リーチ', 'インクリメンタルリーチ', '配信を足して増えた分')
       COMMENT = '放送だけの場合に比べ、配信を足すことで新たに届いた台数',
-    incremental_reach_pct AS DIV0(campaign.incremental_reach, campaign.broadcast_reach) * 100
+    incremental_reach_pct AS ROUND(DIV0(campaign.incremental_reach, campaign.broadcast_reach) * 100, 1)
       WITH SYNONYMS = ('増分リーチ率', 'リーチが増えた割合')
       COMMENT = '放送のリーチに対して何パーセント広がったか',
 
@@ -360,14 +360,14 @@ SELECT PARSE_JSON(
     'BCAST_VIEWING_HANDSON.MART.SVC_PROGRAM_CM_META',
     '{"query": "若い人向けのバラエティ番組", "columns": ["DOC_TYPE","TITLE","GENRE","TIME_SLOT"], "limit": 5}'
   )
-)['results'] AS 検索結果;
+)['results'] AS "検索結果";
 
 SELECT PARSE_JSON(
   SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
     'BCAST_VIEWING_HANDSON.MART.SVC_PROGRAM_CM_META',
     '{"query": "家族で車で出かける様子のコマーシャル", "columns": ["DOC_TYPE","TITLE","CATEGORY"], "limit": 5}'
   )
-)['results'] AS 検索結果;
+)['results'] AS "検索結果";
 
 -- =============================================================================
 -- 第 3 章はここまでです。第 4 章（エージェント）は docs/step4_cowork.md へ。

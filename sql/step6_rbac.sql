@@ -23,9 +23,31 @@
 --   BCAST_ANALYST    MART だけ
 --
 -- 実際にどうなるかを見ます。
+--
+-- ここで 1 つ大事な前置きがあります。
+-- Snowflake のユーザーには「副ロール」という設定があり、既定では
+-- 使えるロールすべてが副ロールとして有効になっています。この状態だと
+-- USE ROLE でロールを切り替えても、元のロールの権限がセッションに残ります。
+-- つまり ACCOUNTADMIN を持っている人が BCAST_ANALYST に切り替えても、
+-- 生データが見えたままになります。
+--
+-- 権限の効き方を確かめるときは、副ロールを切っておく必要があります。
+-- 自分の設定は次で確認できます。
+
+USE ROLE ACCOUNTADMIN;
+SET my_user = (SELECT CURRENT_USER());
+SHOW USERS;
+SELECT "name" AS "ユーザー", "default_secondary_roles" AS "既定の副ロール"
+FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))
+WHERE "name" = $my_user;
+-- ["ALL"] と表示されたら、すべてのロールが副ロールとして有効です。
 
 USE ROLE BCAST_ANALYST;
+USE SECONDARY ROLES NONE;   -- これを入れないと、下の確認が意図どおりに動きません
 USE WAREHOUSE BCAST_HANDSON_WH;
+
+-- いま何のロールで動いているかを確認する
+SELECT CURRENT_ROLE() AS "主ロール", CURRENT_SECONDARY_ROLES() AS "副ロール";
 
 -- 集計データは見られる
 SELECT COUNT(*) AS "行数" FROM BCAST_VIEWING_HANDSON.MART.MART_DEVICE_DAILY;
@@ -85,6 +107,7 @@ ALTER TABLE BCAST_VIEWING_HANDSON.MART.MART_PROGRAM_VIEWING
 
 -- 生データまで扱えるロール。そのまま見えます。
 USE ROLE BCAST_ENGINEER;
+USE SECONDARY ROLES NONE;
 SELECT IP_ADDRESS, COUNT(*) AS "行数"
 FROM BCAST_VIEWING_HANDSON.MART.MART_DEVICE_DAILY
 GROUP BY IP_ADDRESS
@@ -93,6 +116,7 @@ LIMIT 5;
 
 -- 集計だけのロール。末尾が隠れます。
 USE ROLE BCAST_ANALYST;
+USE SECONDARY ROLES NONE;
 SELECT IP_ADDRESS, COUNT(*) AS "行数"
 FROM BCAST_VIEWING_HANDSON.MART.MART_DEVICE_DAILY
 GROUP BY IP_ADDRESS
@@ -108,6 +132,7 @@ FROM BCAST_VIEWING_HANDSON.MART.MART_DEVICE_DAILY;
 -- どこに当たっているかを確認する
 -- -----------------------------------------------------------------------------
 USE ROLE ACCOUNTADMIN;
+USE SECONDARY ROLES ALL;   -- 副ロールを元に戻す
 
 SELECT
   POLICY_NAME    AS "ポリシー",
@@ -190,6 +215,12 @@ GROUP BY NETWORK_NAME ORDER BY 1;
 -- 実運用では、モデルを作り直したあとにポリシーを当て直す処理を
 -- パイプラインの最後に入れておきます。dbt の post-hook に書くのが
 -- ひとつの方法です。
+--
+-- もう 1 つは副ロールです。既定では使えるロールすべてが副ロールとして
+-- 有効になっているため、USE ROLE で切り替えても前の権限が残ります。
+-- 権限の効き方を確かめるときは USE SECONDARY ROLES NONE を入れてください。
+-- これを忘れると「ポリシーを当てたのに効いていない」と見えますが、
+-- 実際には副ロールの権限で見えているだけということがよくあります。
 
 -- =============================================================================
 -- ハンズオンはここまでです。後片付けは sql/cleanup.sql を実行してください。
