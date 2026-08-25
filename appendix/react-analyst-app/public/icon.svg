@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="放送視聴データ アナリストコンソール">
+  <rect width="32" height="32" rx="7" fill="#0a2f5a"/>
+  <!-- 電波（放送）を表す 2 本の弧 -->
+  <path d="M11.2 7.6a8.5 8.5 0 0 0 0 11.2" fill="none" stroke="#29b5e8" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M20.8 7.6a8.5 8.5 0 0 1 0 11.2" fill="none" stroke="#29b5e8" stroke-width="1.8" stroke-linecap="round"/>
+  <!-- 中心の送信点 -->
+  <circle cx="16" cy="13.2" r="2.1" fill="#ffffff"/>
+  <!-- 視聴データの棒グラフ -->
+  <rect x="9.4" y="22.4" width="3.2" height="3.6" rx="1" fill="#ffffff" opacity="0.75"/>
+  <rect x="14.4" y="19.6" width="3.2" height="6.4" rx="1" fill="#ffffff"/>
+  <rect x="19.4" y="21.2" width="3.2" height="4.8" rx="1" fill="#ffffff" opacity="0.75"/>
+</svg>

@@ -1,0 +1,60 @@
+version: 2
+
+sources:
+  - name: raw
+    description: 各局から届いた原本と各種マスタ。加工していない層
+    database: BCAST_VIEWING_HANDSON
+    schema: RAW
+    tables:
+      - name: VIEWING_LOG_NW01
+        description: 第一放送ネットワークから届いた非特定視聴データ。1 行が 1 視聴区間
+      - name: VIEWING_LOG_NW02
+        description: 第二放送ネットワークから届いた非特定視聴データ
+      - name: VIEWING_LOG_NW03
+        description: 第三放送ネットワークから届いた非特定視聴データ。7 月 17 日のログが欠落している
+      - name: VIEWING_LOG_NW04
+        description: 第四放送ネットワークから届いた非特定視聴データ
+      - name: VIEWING_LOG_NW05
+        description: 第五放送ネットワークから届いた非特定視聴データ
+      - name: NETWORK_MASTER
+        description: 局のマスタ
+      - name: PROGRAM_MASTER
+        description: 番組のマスタ。SYNOPSIS に番組の概要文を持つ
+      - name: PROGRAM_SCHEDULE
+        description: 番組の放送枠。視聴ログに番組 ID がないため、時刻の範囲で結合する
+      - name: CM_MASTER
+        description: コマーシャルのマスタ。CREATIVE_DESC に素材の説明文を持つ
+      - name: CM_SPOT
+        description: コマーシャルが放送された時刻
+      - name: STREAMING_LOG
+        description: 配信側の番組視聴ログ
+      - name: STREAMING_AD_LOG
+        description: 配信側の広告表示ログ
+      - name: PANEL_DEMOGRAPHICS
+        description: パネル調査による属性。全体の 10 パーセントの端末にしか値がない
+
+models:
+  - name: stg_viewing_log
+    description: |
+      5 局分の視聴区間を 1 つにまとめ、そのままでは使えない行を除いたもの。
+      ここで初めて 1 台の受信機の動きが局をまたいで見える状態になる。
+    columns:
+      - name: COMMON_ID
+        description: 共通 ID。5 局横断の非特定リンクキー
+        tests:
+          - not_null
+      - name: VIEW_SECONDS
+        description: 視聴した秒数
+        tests:
+          - not_null
+      - name: NETWORK_ID
+        tests:
+          - accepted_values:
+              values: ['NW01', 'NW02', 'NW03', 'NW04', 'NW05']
+
+  - name: stg_streaming_log
+    description: 配信側の番組視聴ログを整えたもの
+    columns:
+      - name: COMMON_ID
+        tests:
+          - not_null

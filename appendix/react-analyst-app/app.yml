@@ -1,0 +1,28 @@
+install:
+  # このリポジトリには package-lock.json をコミットしていないため `npm install` を使います。
+  # ローカルで一度 `npm install` を実行してロックファイルを生成・コミットしたら、
+  # 再現性の高い ["npm", "ci", "--include=dev"] に切り替えてください。
+  commands:
+    - ["npm", "install", "--include=dev"]
+
+run:
+  command: ["node", ".next/standalone/server.js"]
+
+profile:
+  label: "放送視聴データ アナリストコンソール"
+  description: "Cortex Analyst の REST API でセマンティックビューに自然言語で質問し、生成された SQL と結果を自作フロントエンドに描画する付録アプリ。"
+  icon: "public/icon.svg"
+
+# 非秘密の設定値。別のアカウント / 別の名前でハンズオンを構築した場合は
+# ここを書き換えるだけでコード変更なしに差し替えられます。
+# `environment_variables:` は install / run / profile と同じトップレベルのキーです
+# （run: の下にネストすると無視されます）。
+environment_variables:
+  - name: BCAST_SEMANTIC_VIEW
+    value: "BCAST_VIEWING_HANDSON.MART.SV_BROADCAST_VIEWING"
+  - name: BCAST_WAREHOUSE
+    value: "BCAST_HANDSON_WH"
+  # 生成された SQL を呼び出しユーザーの権限で実行したい場合は "true" にします。
+  # 行アクセスポリシー / マスキングポリシーの検証用。既定はオーナー権限。
+  - name: BCAST_CALLERS_RIGHTS
+    value: "false"

@@ -1,0 +1,21 @@
+# Snowflake のワークスペースで dbt を動かすときの接続設定です。
+#
+# ローカルの dbt Core と違い、account と user は使いません。
+# ワークスペースで実行するときは、いまログインしているアカウントとユーザーの
+# 文脈でそのまま動くためです。空文字にしておきます。
+#
+# role にはこのハンズオンで作った BCAST_ENGINEER を指定します。
+# 生データを読み、STG / INT / MART にオブジェクトを作れるロールです。
+
+bcast:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      account: ''
+      user: ''
+      role: BCAST_ENGINEER
+      database: BCAST_VIEWING_HANDSON
+      schema: STG
+      warehouse: BCAST_HANDSON_WH
+      threads: 8

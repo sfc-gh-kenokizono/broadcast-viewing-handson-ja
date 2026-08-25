@@ -1,0 +1,67 @@
+version: 2
+
+models:
+  - name: mart_device_daily
+    description: |
+      1 行が「1 台 × 1 日 × 1 局」。リーチをあらかじめ計算せずにこの粒度で
+      持つことで、日で見ても月で見ても局をまたいで見ても正しい人数が出せる。
+      属性は 10 パーセントの端末にしか入っていない。
+    columns:
+      - name: VIEW_DATE
+        tests:
+          - not_null
+      - name: COMMON_ID
+        description: 共通 ID
+        tests:
+          - not_null
+      - name: VIEW_MINUTES
+        tests:
+          - not_null
+
+  - name: mart_program_viewing
+    description: |
+      1 行が「1 番組の放送回 × 1 台」。視聴台数や推計視聴人数は
+      セマンティックビュー側で重複を除いて数える。
+    columns:
+      - name: PROGRAM_ID
+        tests:
+          - not_null
+      - name: COMMON_ID
+        tests:
+          - not_null
+
+  - name: mart_frequency
+    description: |
+      コマーシャルごと、受信機ごとの接触回数。1 行が 1 つのコマーシャルと
+      1 台の受信機の組み合わせになっている。
+    columns:
+      - name: CM_ID
+        tests:
+          - not_null
+      - name: CONTACT_COUNT
+        tests:
+          - not_null
+
+  - name: mart_incremental_reach
+    description: |
+      放送だけで届いていた人に配信を足したときに、重複を除いてどれだけ
+      広がるか。放送と配信のデータが 1 か所にそろっていないと計算できない指標。
+      1 行が 1 つのコマーシャルなので、そのまま合計しても問題ない。
+    columns:
+      - name: CM_ID
+        tests:
+          - not_null
+          - unique
+      - name: INCREMENTAL_REACH
+        description: 配信を足すことで新たに届いた人数
+        tests:
+          - not_null
+
+  - name: mart_zapping_transition
+    description: |
+      チャンネルの移動。局をまたいだ移動は 1 局のデータだけでは見えず、
+      5 局分を共通 ID で束ねたあとで初めて分かる。
+    columns:
+      - name: TRANSITION_COUNT
+        tests:
+          - not_null

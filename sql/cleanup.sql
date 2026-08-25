@@ -1,0 +1,104 @@
+-- =============================================================================
+-- 後片付け
+-- =============================================================================
+-- このハンズオンで作成したオブジェクトをすべて削除します。
+-- 依存関係があるため、上から順に実行してください。
+--
+-- 環境を残しておきたい場合は、このファイルの末尾にある
+-- 「課金を抑えて残す」の 2 行だけを実行してください。
+-- =============================================================================
+
+USE ROLE ACCOUNTADMIN;
+
+-- -----------------------------------------------------------------------------
+-- 1. エージェントと検索サービス
+-- -----------------------------------------------------------------------------
+DROP AGENT IF EXISTS BCAST_VIEWING_HANDSON.MART.BCAST_VIEWING_AGENT;
+DROP CORTEX SEARCH SERVICE IF EXISTS BCAST_VIEWING_HANDSON.MART.SVC_PROGRAM_CM_META;
+
+-- -----------------------------------------------------------------------------
+-- 2. セマンティックビュー
+-- -----------------------------------------------------------------------------
+DROP SEMANTIC VIEW IF EXISTS BCAST_VIEWING_HANDSON.MART.SV_BROADCAST_VIEWING;
+
+-- -----------------------------------------------------------------------------
+-- 3. ポリシー（当たっている列から外してから削除する）
+-- -----------------------------------------------------------------------------
+ALTER TABLE IF EXISTS BCAST_VIEWING_HANDSON.MART.MART_DEVICE_DAILY
+  MODIFY COLUMN IP_ADDRESS UNSET MASKING POLICY;
+ALTER TABLE IF EXISTS BCAST_VIEWING_HANDSON.MART.MART_PROGRAM_VIEWING
+  MODIFY COLUMN IP_ADDRESS UNSET MASKING POLICY;
+DROP MASKING POLICY IF EXISTS BCAST_VIEWING_HANDSON.MART.MASK_IP_ADDRESS;
+
+-- 第 6 章の任意の部分を実行した場合だけ、次も必要です
+-- ALTER TABLE BCAST_VIEWING_HANDSON.MART.MART_DEVICE_DAILY
+--   DROP ROW ACCESS POLICY BCAST_VIEWING_HANDSON.MART.RAP_NETWORK;
+-- DROP ROW ACCESS POLICY IF EXISTS BCAST_VIEWING_HANDSON.MART.RAP_NETWORK;
+-- DROP ROLE IF EXISTS BCAST_NW01_VIEWER;
+
+-- -----------------------------------------------------------------------------
+-- 4. スケジュール実行と dbt プロジェクト（第 2 章の任意の部分）
+-- -----------------------------------------------------------------------------
+ALTER TASK IF EXISTS BCAST_VIEWING_HANDSON.MART.RUN_BCAST_DBT SUSPEND;
+DROP TASK IF EXISTS BCAST_VIEWING_HANDSON.MART.RUN_BCAST_DBT;
+DROP DBT PROJECT IF EXISTS BCAST_VIEWING_HANDSON.MART.BCAST_DBT_PROJECT;
+
+-- -----------------------------------------------------------------------------
+-- 5. 可視化アプリ
+-- -----------------------------------------------------------------------------
+-- 名前は作成時に付けたものに置き換えてください。
+-- 一覧は次で確認できます。
+-- SHOW STREAMLITS IN SCHEMA BCAST_VIEWING_HANDSON.MART;
+--
+-- DROP STREAMLIT IF EXISTS BCAST_VIEWING_HANDSON.MART."<アプリ名>";
+
+-- -----------------------------------------------------------------------------
+-- 6. データベース（テーブル、ビュー、スキーマもまとめて消えます）
+-- -----------------------------------------------------------------------------
+DROP DATABASE IF EXISTS BCAST_VIEWING_HANDSON;
+
+-- -----------------------------------------------------------------------------
+-- 7. ウェアハウス
+-- -----------------------------------------------------------------------------
+DROP WAREHOUSE IF EXISTS BCAST_HANDSON_WH;
+
+-- -----------------------------------------------------------------------------
+-- 8. GitHub 接続用のオブジェクト
+-- -----------------------------------------------------------------------------
+-- Git リポジトリとシークレットはデータベースの中にあるので、
+-- 上の DROP DATABASE で一緒に消えています。
+-- API 統合はアカウントに属するので別に削除します。
+DROP API INTEGRATION IF EXISTS BCAST_GIT_API;
+
+-- -----------------------------------------------------------------------------
+-- 9. ロール
+-- -----------------------------------------------------------------------------
+DROP ROLE IF EXISTS BCAST_ANALYST;
+DROP ROLE IF EXISTS BCAST_ENGINEER;
+
+-- -----------------------------------------------------------------------------
+-- 10. ワークスペース
+-- -----------------------------------------------------------------------------
+-- ワークスペースは Snowsight の画面から削除します。
+-- Projects、Workspaces を開き、ワークスペース名の横のメニューから Delete を選びます。
+
+-- -----------------------------------------------------------------------------
+-- 残っていないことの確認
+-- -----------------------------------------------------------------------------
+SHOW DATABASES LIKE 'BCAST_VIEWING_HANDSON';
+SHOW WAREHOUSES LIKE 'BCAST_HANDSON_WH';
+SHOW ROLES LIKE 'BCAST_%';
+
+-- =============================================================================
+-- 課金を抑えて残す
+-- =============================================================================
+-- 削除せずに環境を残しておきたい場合は、次の 2 つだけを実行してください。
+-- 検索サービスは索引を保持している間ずっと少しずつ課金されるので、
+-- 使わない期間は止めておくのが無駄がありません。
+--
+-- ALTER CORTEX SEARCH SERVICE BCAST_VIEWING_HANDSON.MART.SVC_PROGRAM_CM_META SUSPEND;
+-- ALTER WAREHOUSE BCAST_HANDSON_WH SUSPEND;
+--
+-- 再開するときは次のとおりです。
+-- ALTER CORTEX SEARCH SERVICE BCAST_VIEWING_HANDSON.MART.SVC_PROGRAM_CM_META RESUME;
+-- =============================================================================

@@ -1,0 +1,23 @@
+definition_version: "2"
+
+entities:
+  react_analyst_app:
+    type: snowflake-app
+    identifier:
+      name: REACT_ANALYST_APP
+      database: APPS
+      schema: PUBLIC
+    artifacts:
+      - src: ./*
+        dest: ./
+        ignore:
+          - node_modules
+          - .env*
+          - __pycache__
+          - "*.pyc"
+          - .next
+          - .git
+          - snowflake.log
+
+    query_warehouse: APP_WAREHOUSE
+    code_stage: REACT_ANALYST_APP_CODE

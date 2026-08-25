@@ -1,0 +1,27 @@
+name: 'bcast_viewing'
+version: '1.0.0'
+config-version: 2
+profile: 'bcast'
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# 層ごとにスキーマとマテリアライズを分ける。
+# staging と intermediate はビューにして、必要になったときに計算する。
+# marts は可視化アプリやエージェントが繰り返し参照するのでテーブルにする。
+models:
+  bcast_viewing:
+    staging:
+      +schema: STG
+      +materialized: view
+    intermediate:
+      +schema: INT
+      +materialized: view
+    marts:
+      +schema: MART
+      +materialized: table
