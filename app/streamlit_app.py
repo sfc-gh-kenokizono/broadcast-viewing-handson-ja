@@ -235,7 +235,7 @@ with tab2:
     )
 
     with st.expander("番組の一覧を表で見る"):
-        st.dataframe(programs, use_container_width=True, hide_index=True)
+        st.dataframe(programs, use_container_width=True)
 
 # -----------------------------------------------------------------------------
 # チャンネル移動
@@ -273,7 +273,7 @@ with tab3:
     st.altair_chart(styled(chart), use_container_width=True)
 
     with st.expander("移動の一覧を表で見る"):
-        st.dataframe(zap, use_container_width=True, hide_index=True)
+        st.dataframe(zap, use_container_width=True)
 
 # -----------------------------------------------------------------------------
 # 増分リーチ
@@ -344,9 +344,9 @@ with tab4:
     st.altair_chart(styled(chart), use_container_width=True)
 
     with st.expander("増分リーチの一覧を表で見る"):
-        st.dataframe(inc, use_container_width=True, hide_index=True)
+        st.dataframe(inc, use_container_width=True)
 
-st.divider()
+st.markdown("---")
 st.caption(
     "指標の定義はセマンティックビュー BCAST_VIEWING_HANDSON.MART.SV_BROADCAST_VIEWING に"
     "置いてあります。このアプリとエージェントは同じ定義を参照しています。"

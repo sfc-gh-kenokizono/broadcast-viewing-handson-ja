@@ -69,6 +69,14 @@ def styled(chart):
 
 ## うまく動かないとき
 
+**`TypeError: ... got an unexpected keyword argument 'hide_index'` や `module 'streamlit' has no attribute 'divider'` と出る場合**
+
+Streamlit in Snowflake の実行環境の Streamlit は、手元で `pip install streamlit` したものより古いことがあります。新しめの API（`st.dataframe(..., hide_index=True)` は 1.23 以降、`st.divider()` は 1.25 以降）を書くと、この形で落ちます。
+
+Streamlit はスクリプト全体を上から下まで実行するので、**あるタブの中の 1 行が原因でも、全タブの下にエラーが出ます**。エラー文の `File ".../streamlit_app.py", line N` の行だけを直せば解消します。
+
+同梱の [app/streamlit_app.py](../app/streamlit_app.py) は、古い実行環境でも動く書き方に寄せてあります。
+
 **`Insufficient privileges to operate on table 'MART_DEVICE_DAILY'` と出る場合**
 
 Streamlit は所有者権限で動きます。エラー文にある `The owner role ... must have SELECT granted on TABLE ...` が示すとおり、**アプリを作ったロールがマート層を読めていません**。
