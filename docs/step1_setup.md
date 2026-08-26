@@ -40,6 +40,26 @@ CREATE OR REPLACE API INTEGRATION BCAST_GIT_API
 
 `API_ALLOWED_PREFIXES` は「このアカウントから外に出ていってよい先」の宣言です。ここに書いていないドメインには接続できません。外部との通信を管理者が宣言した先に限定できる、というのがこの仕組みの意図です。
 
+### Git リポジトリのステージからは直接読み込めません
+
+リポジトリの中身はステージとして見えますが、そこから `COPY INTO` でテーブルに読み込むことは**できません**。次のエラーになります。
+
+```
+Unsupported feature 'Copy into table from Git Repository'.
+```
+
+Git リポジトリのステージは「コードを置く場所」であって、大量データを読み込む口ではない、という設計です。そこで `COPY FILES` でいったん内部ステージに移してから読み込みます。
+
+```sql
+CREATE OR REPLACE STAGE BCAST_RAW_STAGE;
+
+COPY FILES
+  INTO @BCAST_RAW_STAGE
+  FROM @BCAST_REPO/branches/main/data/;
+```
+
+`COPY FILES` はウェアハウスを使わないサーバーレスの処理なので、数秒で終わります。実務でも、リポジトリで管理したい定義ファイルと、ステージに置きたいデータファイルは分けて考えることになります。
+
 ## 層の分け方について
 
 作成するスキーマは 4 つです。
