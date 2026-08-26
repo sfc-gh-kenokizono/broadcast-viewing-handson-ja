@@ -48,19 +48,29 @@ def run(sql: str) -> pd.DataFrame:
 # 絞り込み
 # -----------------------------------------------------------------------------
 st.title("放送視聴データ")
-st.caption("非特定視聴データにもとづく視聴実績。対象期間は 2026 年 7 月 1 日から 7 月 31 日です。")
 
 networks = run(f"SELECT DISTINCT NETWORK_NAME FROM {MART}.MART_DEVICE_DAILY ORDER BY 1")
 network_list = networks["NETWORK_NAME"].tolist()
+
+# 対象期間はデータから取る。ここを固定値にすると、データを作り直したときに
+# 画面の初期値と実データがずれる。
+span = run(f"SELECT MIN(VIEW_DATE) AS D_MIN, MAX(VIEW_DATE) AS D_MAX FROM {MART}.MART_DEVICE_DAILY")
+d_min = pd.Timestamp(span["D_MIN"].iloc[0]).date()
+d_max = pd.Timestamp(span["D_MAX"].iloc[0]).date()
+st.caption(
+    "非特定視聴データにもとづく視聴実績。対象期間は "
+    f"{d_min.year} 年 {d_min.month} 月 {d_min.day} 日から "
+    f"{d_max.year} 年 {d_max.month} 月 {d_max.day} 日です。"
+)
 
 with st.sidebar:
     st.header("絞り込み")
     selected_networks = st.multiselect("局", network_list, default=network_list)
     date_from, date_to = st.date_input(
         "期間",
-        value=(pd.Timestamp("2026-07-01").date(), pd.Timestamp("2026-07-31").date()),
-        min_value=pd.Timestamp("2026-07-01").date(),
-        max_value=pd.Timestamp("2026-07-31").date(),
+        value=(d_min, d_max),
+        min_value=d_min,
+        max_value=d_max,
     )
 
 if not selected_networks:

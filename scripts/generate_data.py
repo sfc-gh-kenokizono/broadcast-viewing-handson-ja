@@ -30,8 +30,11 @@ from pathlib import Path
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
-PERIOD_START = date(2026, 7, 1)
+# 蓄積されていくデータを実感してもらうため 3 ヶ月分にしてある。
+# 1 ヶ月だと月次の推移が 1 点しか出ず、伸びや季節の動きが見えない。
+PERIOD_START = date(2026, 5, 1)
 PERIOD_END = date(2026, 7, 31)
+PERIOD_DAYS = (PERIOD_END - PERIOD_START).days      # 期間の日数 - 1（randint の上限に使う）
 MISSING_DAY = date(2026, 7, 17)      # NW03 のログが届かなかった日
 MISSING_NETWORK = "NW03"
 
@@ -242,6 +245,19 @@ def station_device_id(network_id: str, common_id: str) -> str:
     return f"{network_id}-D-{digest[:10]}"
 
 
+def date_trend(d: date, start_factor: float, end_factor: float) -> float:
+    """期間の中で少しずつ変えるための係数。
+
+    3 ヶ月分を用意しても、どの日も同じ量なら月次の推移が平らになり、
+    蓄積していくデータを見る意味がなくなる。放送は微減、配信は伸びるという
+    実際に議論になる形になるよう、逆向きの係数をかけている。
+    """
+    if PERIOD_DAYS == 0:
+        return start_factor
+    ratio = (d - PERIOD_START).days / PERIOD_DAYS
+    return start_factor + (end_factor - start_factor) * ratio
+
+
 def dates_in_period():
     d = PERIOD_START
     while d <= PERIOD_END:
@@ -383,7 +399,7 @@ def assign_panel(rng: random.Random, devices, panel_size: int):
         rows.append([
             dev["common_id"],
             segment,
-            (PERIOD_START + timedelta(days=rng.randint(0, 30))).isoformat(),
+            (PERIOD_START + timedelta(days=rng.randint(0, PERIOD_DAYS))).isoformat(),
         ])
     return rows
 
@@ -433,7 +449,10 @@ def build_viewing_logs(rng: random.Random, devices, schedule, total_rows: int):
         # この局に届かない日の枠は最初から除いておく
         usable = [s for s in slots
                   if not (network_id == MISSING_NETWORK and s["air_date"] == MISSING_DAY)]
-        slot_weights = [TIME_SLOTS[s["time_slot"]]["weight"] for s in usable]
+        # 時間帯の重みに、日付のトレンド（放送は微減）を掛けておく
+        slot_weights = [TIME_SLOTS[s["time_slot"]]["weight"]
+                        * date_trend(s["air_date"], 1.12, 0.88)
+                        for s in usable]
         rows = []
         # rng.choices は C 実装で、まとめて引くと 1 件ずつ選ぶより桁違いに速い
         batch = 20000
@@ -498,6 +517,9 @@ def build_streaming(rng: random.Random, devices, programs, n_logs: int):
     duration_values = [3, 7, 12, 20, 30, 45]
     duration_weights = [22, 24, 20, 16, 12, 6]
     hours = [7, 8, 12, 13, 18, 19, 20, 21, 22, 23]
+    # 配信は期間の後半に重みを置く（伸びている側）
+    all_dates = list(dates_in_period())
+    date_weights = [date_trend(d, 0.7, 1.3) for d in all_dates]
 
     rows = []
     batch = 20000
@@ -506,12 +528,12 @@ def build_streaming(rng: random.Random, devices, programs, n_logs: int):
         picked_progs = rng.choices(programs, weights=prog_weights, k=batch)
         picked_durations = rng.choices(duration_values, weights=duration_weights, k=batch)
         picked_types = rng.choices(dev_types, weights=dev_type_weights, k=batch)
-        for dev, p, duration, dtype in zip(picked_devs, picked_progs,
-                                           picked_durations, picked_types):
+        picked_dates = rng.choices(all_dates, weights=date_weights, k=batch)
+        for dev, p, duration, dtype, d in zip(picked_devs, picked_progs,
+                                              picked_durations, picked_types, picked_dates):
             accept = 0.6 * genre_affinity(dev, p["genre"]) * dev["nw_affinity"][p["network_id"]]
             if rng.random() > min(1.0, accept):
                 continue
-            d = PERIOD_START + timedelta(days=rng.randint(0, 30))
             start = datetime(d.year, d.month, d.day, rng.choice(hours), rng.randint(0, 59))
             rows.append([
                 dev["common_id"],
@@ -587,9 +609,12 @@ def build_streaming_ads(rng: random.Random, devices, n_imps: int):
     picked_devs = rng.choices(pool, k=n_imps)
     picked_cms = rng.choices(cm_ids, weights=cm_weights, k=n_imps)
     picked_types = rng.choices(dev_types, weights=dev_type_weights, k=n_imps)
+    all_dates = list(dates_in_period())
+    date_weights = [date_trend(d, 0.7, 1.3) for d in all_dates]
+    picked_dates = rng.choices(all_dates, weights=date_weights, k=n_imps)
     rows = []
-    for i, (dev, cm_id, dtype) in enumerate(zip(picked_devs, picked_cms, picked_types)):
-        d = PERIOD_START + timedelta(days=rng.randint(0, 30))
+    for i, (dev, cm_id, dtype, d) in enumerate(zip(picked_devs, picked_cms,
+                                                   picked_types, picked_dates)):
         imp_at = datetime(d.year, d.month, d.day, rng.randint(6, 23), rng.randint(0, 59),
                           rng.randint(0, 59))
         rows.append([
@@ -607,11 +632,11 @@ def main():
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--devices", type=int, default=20000, help="共通 ID の数")
     parser.add_argument("--ips", type=int, default=12000, help="IP アドレスの数")
-    parser.add_argument("--viewing-total", type=int, default=500000,
+    parser.add_argument("--viewing-total", type=int, default=1050000,
                         help="視聴区間の合計行数。局ごとの配分は NETWORK_SHARE に従う")
-    parser.add_argument("--streaming-logs", type=int, default=80000)
-    parser.add_argument("--streaming-ads", type=int, default=30000)
-    parser.add_argument("--cm-spots", type=int, default=500)
+    parser.add_argument("--streaming-logs", type=int, default=240000)
+    parser.add_argument("--streaming-ads", type=int, default=45000)
+    parser.add_argument("--cm-spots", type=int, default=750)
     parser.add_argument("--panel", type=int, default=2000)
     parser.add_argument("--no-compress", action="store_true")
     args = parser.parse_args()

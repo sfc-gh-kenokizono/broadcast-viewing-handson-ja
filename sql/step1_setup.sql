@@ -33,6 +33,13 @@ SET current_user_name = (SELECT CURRENT_USER());
 GRANT ROLE BCAST_ENGINEER TO USER IDENTIFIER($current_user_name);
 GRANT ROLE BCAST_ANALYST  TO USER IDENTIFIER($current_user_name);
 
+-- カスタムロールは SYSADMIN の下にぶら下げる（Snowflake の推奨構成）
+-- ここを省くと、BCAST_ENGINEER が作ったテーブルに ACCOUNTADMIN でも到達できません。
+-- Streamlit は所有者権限で動くため、アプリ作成ロールに参照経路がないと
+-- 「Insufficient privileges to operate on table」で落ちます。
+GRANT ROLE BCAST_ENGINEER TO ROLE SYSADMIN;
+GRANT ROLE BCAST_ANALYST  TO ROLE SYSADMIN;
+
 -- Cortex の機能を使うための権限
 GRANT DATABASE ROLE SNOWFLAKE.CORTEX_USER TO ROLE BCAST_ENGINEER;
 GRANT DATABASE ROLE SNOWFLAKE.CORTEX_USER TO ROLE BCAST_ANALYST;

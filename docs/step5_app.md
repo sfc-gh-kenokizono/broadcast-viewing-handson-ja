@@ -19,6 +19,11 @@
 | App title | 放送視聴データ |
 | App location | `BCAST_VIEWING_HANDSON` の `MART` |
 | App warehouse | `BCAST_HANDSON_WH` |
+| 画面右上のロール | `BCAST_ANALYST` |
+
+ロールを `BCAST_ANALYST` にしてください。Streamlit は**作成したロールの権限で動きます**（所有者権限）。
+マート層を参照できるロールで作らないと、起動時に
+`Insufficient privileges to operate on table` で落ちます。
 
 4. Create を選ぶと編集画面が開きます
 5. 既定で入っているコードをすべて消し、[app/streamlit_app.py](../app/streamlit_app.py) の内容を貼り付けます
@@ -30,8 +35,7 @@
 
 | タブ | 内容 | 見どころ |
 |---|---|---|
-| リーチの推移 | 日別・局別のリーチ、エリア別のリーチ | 第三放送ネットワークの 7 月 17 日が落ちている |
-| 番組 | 番組別の視聴台数、セグメント別の傾向 | 属性が分かるのは 10 パーセントだけという注意書き |
+| リーチの推移 | 日別・局別のリーチ、エリア別のリーチ | 第三放送ネットワークの 7 月 17 日が落ちている || 番組 | 番組別の視聴台数、セグメント別の傾向 | 属性が分かるのは 10 パーセントだけという注意書き |
 | チャンネル移動 | 局から局への移動 | 5 局を束ねないと出ない数字 |
 | 増分リーチ | 接触の内訳と増えた割合 | 放送と配信が 1 か所にないと計算できない指標 |
 
@@ -62,6 +66,25 @@ def styled(chart):
 左の絞り込みで局や期間を変えてみてください。数字とグラフが連動して変わります。
 
 `@st.cache_data(ttl=600)` を付けているので、同じ絞り込みに戻したときは Snowflake に問い合わせ直しません。動かすたびにウェアハウスが動くわけではない、ということです。
+
+## うまく動かないとき
+
+**`Insufficient privileges to operate on table 'MART_DEVICE_DAILY'` と出る場合**
+
+Streamlit は所有者権限で動きます。エラー文にある `The owner role ... must have SELECT granted on TABLE ...` が示すとおり、**アプリを作ったロールがマート層を読めていません**。
+
+マート層のテーブルは `BCAST_ENGINEER` が作ったので、そのロールへの経路がないロール（たとえば `ACCOUNTADMIN` にカスタムロールを繋いでいない状態）でアプリを作ると再現します。次のどちらかで解消します。
+
+```sql
+-- 案 1: アプリを BCAST_ANALYST ロールで作り直す（推奨）
+
+-- 案 2: カスタムロールを SYSADMIN の下にぶら下げる（第 1 章に含めてあります）
+USE ROLE ACCOUNTADMIN;
+GRANT ROLE BCAST_ENGINEER TO ROLE SYSADMIN;
+GRANT ROLE BCAST_ANALYST  TO ROLE SYSADMIN;
+```
+
+カスタムロールを作ったら `SYSADMIN` の下に繋ぐ、というのが Snowflake の推奨構成です。ここを飛ばすと、管理者ロールでも他ロールが作ったオブジェクトに手が届きません。
 
 ## 付録について
 
