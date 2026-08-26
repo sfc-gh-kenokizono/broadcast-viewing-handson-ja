@@ -23,13 +23,11 @@ sources:
       - name: PROGRAM_SCHEDULE
         description: 番組の放送枠。視聴ログに番組 ID がないため、時刻の範囲で結合する
       - name: CM_MASTER
-        description: コマーシャルのマスタ。CREATIVE_DESC に素材の説明文を持つ
+        description: |
+          コマーシャルのマスタ。CREATIVE_DESC に素材の説明文を持ち、
+          CAMPAIGN_FROM / CAMPAIGN_TO に出稿期間を持つ
       - name: CM_SPOT
         description: コマーシャルが放送された時刻
-      - name: STREAMING_LOG
-        description: 配信側の番組視聴ログ
-      - name: STREAMING_AD_LOG
-        description: 配信側の広告表示ログ
       - name: PANEL_DEMOGRAPHICS
         description: パネル調査による属性。全体の 10 パーセントの端末にしか値がない
 
@@ -51,10 +49,3 @@ models:
         tests:
           - accepted_values:
               values: ['NW01', 'NW02', 'NW03', 'NW04', 'NW05']
-
-  - name: stg_streaming_log
-    description: 配信側の番組視聴ログを整えたもの
-    columns:
-      - name: COMMON_ID
-        tests:
-          - not_null

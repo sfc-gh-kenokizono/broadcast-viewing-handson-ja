@@ -104,7 +104,7 @@ st.info(
     "世帯の代わりに IP アドレスを使うと、その分がまとめて 1 つとして数えられます。"
 )
 
-tab1, tab2, tab3, tab4 = st.tabs(["リーチの推移", "番組", "チャンネル移動", "増分リーチ"])
+tab1, tab2, tab3, tab4 = st.tabs(["リーチの推移", "番組", "チャンネル移動", "フリークエンシー"])
 
 # -----------------------------------------------------------------------------
 # リーチの推移
@@ -276,75 +276,83 @@ with tab3:
         st.dataframe(zap, use_container_width=True)
 
 # -----------------------------------------------------------------------------
-# 増分リーチ
+# フリークエンシー
 # -----------------------------------------------------------------------------
 with tab4:
     st.markdown(
-        "放送だけで届いていた人に配信を足したとき、重複を除いてどれだけ広がるかです。"
-        "放送と配信のデータが 1 か所にそろっていないと計算できません。"
-        "別々の場所にあると、どちらでも届いた人を 1 人として数えられないためです。"
+        "同じ受信機に何回コマーシャルが当たったかです。"
+        "**リーチ × 平均フリークエンシー = インプレッション** の関係にあり、"
+        "3 つのうち 2 つが決まれば残りが決まります。"
+    )
+    st.warning(
+        "放送のコマーシャル接触は実測ではありません。視聴区間にスポットの放送時刻が"
+        "入っていたかどうかで判定した推定値です。席を外していても接触として数えます。"
     )
 
-    inc = run(f"""
+    freq = run(f"""
         SELECT
           ADVERTISER,
           CATEGORY,
-          BROADCAST_ONLY_REACH,
-          BOTH_REACH,
-          STREAMING_ONLY_REACH,
-          BROADCAST_REACH,
-          COMBINED_REACH,
-          INCREMENTAL_REACH,
-          INCREMENTAL_REACH_PCT,
-          COMBINED_FREQUENCY
-        FROM {MART}.MART_INCREMENTAL_REACH
-        ORDER BY BROADCAST_REACH DESC
+          MIN(CAMPAIGN_FROM)                          AS CAMPAIGN_FROM,
+          MAX(CAMPAIGN_TO)                            AS CAMPAIGN_TO,
+          COUNT(DISTINCT COMMON_ID)                   AS REACH_DEVICES,
+          SUM(CONTACT_COUNT)                          AS IMPRESSIONS,
+          ROUND(SUM(CONTACT_COUNT) / COUNT(DISTINCT COMMON_ID), 2) AS AVG_FREQUENCY
+        FROM {MART}.MART_FREQUENCY
+        GROUP BY ADVERTISER, CATEGORY
+        ORDER BY IMPRESSIONS DESC
     """)
 
-    breakdown = inc.melt(
-        id_vars=["ADVERTISER"],
-        value_vars=["BROADCAST_ONLY_REACH", "BOTH_REACH", "STREAMING_ONLY_REACH"],
-        var_name="KIND",
-        value_name="DEVICES",
-    )
-    label = {
-        "BROADCAST_ONLY_REACH": "放送のみ接触",
-        "BOTH_REACH": "両方に接触",
-        "STREAMING_ONLY_REACH": "配信のみ接触",
-    }
-    breakdown["KIND"] = breakdown["KIND"].map(label)
-
     chart = (
-        alt.Chart(breakdown)
-        .mark_bar()
+        alt.Chart(freq)
+        .mark_circle()
         .encode(
-            x=alt.X("DEVICES:Q", title="台数", stack="zero"),
-            y=alt.Y("ADVERTISER:N", title="広告主", sort="-x"),
-            color=alt.Color("KIND:N", title="接触の種類",
-                            scale=alt.Scale(domain=list(label.values()),
-                                            range=[DEEP, AMBER, BLUE])),
-            tooltip=["ADVERTISER:N", "KIND:N", "DEVICES:Q"],
+            x=alt.X("REACH_DEVICES:Q", title="リーチ（台数）"),
+            y=alt.Y("AVG_FREQUENCY:Q", title="平均フリークエンシー（回）"),
+            size=alt.Size("IMPRESSIONS:Q", title="インプレッション"),
+            color=alt.Color("CATEGORY:N", title="業種",
+                            scale=alt.Scale(scheme="tableau10")),
+            tooltip=["ADVERTISER:N", "REACH_DEVICES:Q", "AVG_FREQUENCY:Q",
+                     "IMPRESSIONS:Q", "CAMPAIGN_FROM:T", "CAMPAIGN_TO:T"],
         )
-        .properties(height=520, title="接触の内訳")
+        .properties(height=420, title="リーチと平均フリークエンシー（円の大きさがインプレッション）")
     )
     st.altair_chart(styled(chart), use_container_width=True)
 
-    st.subheader("配信を足して増えた割合")
+    st.markdown(
+        "右上にあるほど「広く、かつ何度も当たっている」ことになります。"
+        "同じインプレッションでも、広く薄く当てているのか、狭く何度も当てているのかで"
+        "置かれる位置が変わります。ここが出稿の設計の判断材料になります。"
+    )
+
+    st.subheader("接触回数の分布")
+    band = run(f"""
+        SELECT
+          FREQUENCY_BAND,
+          COUNT(*) AS DEVICES
+        FROM {MART}.MART_FREQUENCY
+        GROUP BY FREQUENCY_BAND
+    """)
+    band_order = ["1 回", "2 から 3 回", "4 から 7 回", "8 から 15 回", "16 回以上"]
     chart = (
-        alt.Chart(inc)
-        .mark_bar(color=GREEN)
+        alt.Chart(band)
+        .mark_bar(color=BLUE)
         .encode(
-            x=alt.X("INCREMENTAL_REACH_PCT:Q", title="増えた割合（パーセント）"),
-            y=alt.Y("ADVERTISER:N", title="広告主", sort="-x"),
-            tooltip=["ADVERTISER:N", "BROADCAST_REACH:Q",
-                     "INCREMENTAL_REACH:Q", "INCREMENTAL_REACH_PCT:Q"],
+            x=alt.X("FREQUENCY_BAND:N", title="接触回数", sort=band_order),
+            y=alt.Y("DEVICES:Q", title="コマーシャル × 台数の組み合わせ"),
+            tooltip=["FREQUENCY_BAND:N", "DEVICES:Q"],
         )
-        .properties(height=520)
+        .properties(height=320)
     )
     st.altair_chart(styled(chart), use_container_width=True)
 
-    with st.expander("増分リーチの一覧を表で見る"):
-        st.dataframe(inc, use_container_width=True)
+    st.caption(
+        "1 回しか当たっていない組み合わせが多く、回数が増えるほど少なくなります。"
+        "平均だけを見ていると、この偏りが見えません。"
+    )
+
+    with st.expander("広告主ごとの一覧を表で見る"):
+        st.dataframe(freq, use_container_width=True)
 
 st.markdown("---")
 st.caption(

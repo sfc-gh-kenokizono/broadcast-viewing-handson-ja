@@ -10,7 +10,7 @@
 --   3. 集計データだけを見るロールに、両方を使う権限を渡す
 --
 -- なぜセマンティックビューを作るのか
---   「リーチ」「フリークエンシー」「増分リーチ」が何を指すのかを、
+--   「リーチ」「フリークエンシー」「インプレッション」が何を指すのかを、
 --   一度ここで決めてしまうためです。以降は可視化アプリでもエージェントでも
 --   同じ定義が使われるので、画面ごとに数字が違うという事態が起きません。
 -- =============================================================================
@@ -50,23 +50,13 @@ CREATE OR REPLACE SEMANTIC VIEW SV_BROADCAST_VIEWING
       WITH SYNONYMS = ('番組視聴', '番組別の視聴')
       COMMENT = '1 行が 1 つの番組の放送回を 1 台が視聴した記録',
 
-    ad_contact AS BCAST_VIEWING_HANDSON.MART.MART_FREQUENCY
-      WITH SYNONYMS = ('広告接触', 'コマーシャル接触')
-      COMMENT = '1 行が 1 つのコマーシャルと 1 台の受信機の組み合わせ。接触回数を持つ',
-
-    campaign AS BCAST_VIEWING_HANDSON.MART.MART_INCREMENTAL_REACH
-      PRIMARY KEY (CM_ID)
-      WITH SYNONYMS = ('出稿', 'キャンペーン', '広告出稿')
-      COMMENT = '1 行が 1 つのコマーシャル。放送と配信を合わせたリーチの内訳を持つ',
+    cm_contact AS BCAST_VIEWING_HANDSON.MART.MART_FREQUENCY
+      WITH SYNONYMS = ('広告接触', 'コマーシャル接触', 'キャンペーン')
+      COMMENT = '1 行が 1 つのコマーシャルと 1 台の受信機の組み合わせ。接触回数を持つ。放送の接触は実測でなく、視聴区間にスポットの放送時刻が入っていたかで判定した推定値',
 
     zapping AS BCAST_VIEWING_HANDSON.MART.MART_ZAPPING_TRANSITION
       WITH SYNONYMS = ('チャンネル移動', 'ザッピング')
       COMMENT = '局をまたいだチャンネル移動の集計'
-  )
-
-  RELATIONSHIPS (
-    ad_contact_to_campaign AS
-      ad_contact (CM_ID) REFERENCES campaign
   )
 
   FACTS (
@@ -78,7 +68,7 @@ CREATE OR REPLACE SEMANTIC VIEW SV_BROADCAST_VIEWING
       COMMENT = 'その番組を見た分数',
     program_viewing.completion AS COMPLETION_RATE
       COMMENT = 'その放送回をどれだけ見通したか。1 に近いほど最後まで見ている',
-    ad_contact.contacts AS CONTACT_COUNT
+    cm_contact.contacts AS CONTACT_COUNT
       COMMENT = 'そのコマーシャルに接触した回数'
   )
 
@@ -124,23 +114,21 @@ CREATE OR REPLACE SEMANTIC VIEW SV_BROADCAST_VIEWING
       COMMENT = 'その番組を見た端末の性年代。パネル分にしか値がない',
 
     -- 広告接触の切り口
-    ad_contact.advertiser AS ADVERTISER
+    cm_contact.advertiser AS ADVERTISER
       WITH SYNONYMS = ('広告主', 'スポンサー')
       COMMENT = '広告主の名前',
-    ad_contact.category AS CATEGORY
+    cm_contact.category AS CATEGORY
       WITH SYNONYMS = ('業種', '広告のカテゴリ')
       COMMENT = '広告主の業種',
-    ad_contact.frequency_band AS FREQUENCY_BAND
+    cm_contact.frequency_band AS FREQUENCY_BAND
       WITH SYNONYMS = ('接触回数帯', 'フリークエンシーの区分')
       COMMENT = '接触回数を区分にまとめたもの',
-
-    -- 出稿の切り口
-    campaign.campaign_advertiser AS ADVERTISER
-      WITH SYNONYMS = ('出稿の広告主')
-      COMMENT = '出稿している広告主',
-    campaign.campaign_category AS CATEGORY
-      WITH SYNONYMS = ('出稿の業種')
-      COMMENT = '出稿している広告主の業種',
+    cm_contact.campaign_from AS CAMPAIGN_FROM
+      WITH SYNONYMS = ('出稿開始日', 'キャンペーン開始日')
+      COMMENT = 'そのコマーシャルの出稿期間の開始日',
+    cm_contact.campaign_to AS CAMPAIGN_TO
+      WITH SYNONYMS = ('出稿終了日', 'キャンペーン終了日')
+      COMMENT = 'そのコマーシャルの出稿期間の終了日。出稿は 2 週間から 4 週間で行われる',
 
     -- チャンネル移動の切り口
     zapping.zapping_date AS VIEW_DATE
@@ -190,35 +178,18 @@ CREATE OR REPLACE SEMANTIC VIEW SV_BROADCAST_VIEWING
       COMMENT = '放送回をどれだけ見通したかの平均',
 
     -- 広告接触の指標
-    ad_contact.contact_reach AS COUNT(DISTINCT ad_contact.COMMON_ID)
-      WITH SYNONYMS = ('接触リーチ', '広告が届いた台数')
-      COMMENT = 'そのコマーシャルに 1 回以上接触した受信機の台数',
-    ad_contact.total_contacts AS SUM(ad_contact.contacts)
-      WITH SYNONYMS = ('総接触回数', '延べ接触回数')
-      COMMENT = '接触回数の合計',
-    avg_frequency AS ROUND(DIV0(ad_contact.total_contacts, ad_contact.contact_reach), 2)
+    -- リーチ、フリークエンシー、インプレッションは
+    -- リーチ × 平均フリークエンシー = インプレッション の関係にある。
+    -- 3 つのうち 2 つが決まれば残りが決まるので、定義をここに 1 つだけ置く。
+    cm_contact.contact_reach AS COUNT(DISTINCT cm_contact.COMMON_ID)
+      WITH SYNONYMS = ('接触リーチ', '広告が届いた台数', 'CMのリーチ')
+      COMMENT = 'そのコマーシャルに 1 回以上接触した受信機の台数。重複を除いて数えている',
+    cm_contact.impressions AS SUM(cm_contact.contacts)
+      WITH SYNONYMS = ('インプレッション', '総接触回数', '延べ接触回数', 'のべ接触')
+      COMMENT = '接触回数の合計。同じ受信機への複数回の接触をすべて数えた延べの回数。リーチ × 平均フリークエンシーと一致する',
+    avg_frequency AS ROUND(DIV0(cm_contact.impressions, cm_contact.contact_reach), 2)
       WITH SYNONYMS = ('フリークエンシー', '平均接触回数', '同じ人に何回見せたか')
-      COMMENT = '1 台あたりの平均接触回数',
-
-    -- 増分リーチ。1 行が 1 つのコマーシャルなので合計しても問題ない
-    campaign.broadcast_reach AS SUM(campaign.BROADCAST_REACH)
-      WITH SYNONYMS = ('放送のリーチ', 'テレビのリーチ')
-      COMMENT = '放送で接触した台数',
-    campaign.streaming_only_reach AS SUM(campaign.STREAMING_ONLY_REACH)
-      WITH SYNONYMS = ('配信だけで届いた台数')
-      COMMENT = '放送では届かず配信だけで届いた台数',
-    campaign.both_reach AS SUM(campaign.BOTH_REACH)
-      WITH SYNONYMS = ('両方に接触した台数', '重複した台数')
-      COMMENT = '放送と配信の両方で接触した台数',
-    campaign.combined_reach AS SUM(campaign.COMBINED_REACH)
-      WITH SYNONYMS = ('合計リーチ', '放送と配信を合わせたリーチ')
-      COMMENT = '放送と配信を合わせ、重複を除いたリーチ',
-    campaign.incremental_reach AS SUM(campaign.INCREMENTAL_REACH)
-      WITH SYNONYMS = ('増分リーチ', 'インクリメンタルリーチ', '配信を足して増えた分')
-      COMMENT = '放送だけの場合に比べ、配信を足すことで新たに届いた台数',
-    incremental_reach_pct AS ROUND(DIV0(campaign.incremental_reach, campaign.broadcast_reach) * 100, 1)
-      WITH SYNONYMS = ('増分リーチ率', 'リーチが増えた割合')
-      COMMENT = '放送のリーチに対して何パーセント広がったか',
+      COMMENT = '接触した 1 台あたりの平均接触回数。分母は接触した台数であり、全台数ではない',
 
     -- チャンネル移動の指標
     zapping.transitions AS SUM(zapping.TRANSITION_COUNT)
@@ -226,9 +197,9 @@ CREATE OR REPLACE SEMANTIC VIEW SV_BROADCAST_VIEWING
       COMMENT = 'チャンネルを移動した回数の合計'
   )
 
-  COMMENT = '放送と配信の非特定視聴データにもとづく視聴指標。リーチ、フリークエンシー、増分リーチ、番組別の視聴実績、チャンネル移動を扱う'
+  COMMENT = '地上波 5 局の非特定視聴データにもとづく視聴指標。リーチ、フリークエンシー、インプレッション、番組別の視聴実績、チャンネル移動を扱う'
 
-  AI_SQL_GENERATION '数値は小数第 1 位までに丸めてください。日付の範囲が指定されていない場合は 2026 年 7 月の全期間を対象にしてください。セグメントを使った集計を返すときは、パネル調査で属性が判明している端末が全体の 10 パーセントであり、全体の姿ではないことを回答に添えてください。';
+  AI_SQL_GENERATION '数値は小数第 1 位までに丸めてください。日付の範囲が指定されていない場合は 2026 年 5 月 1 日から 7 月 31 日までの全期間を対象にしてください。セグメントを使った集計を返すときは、パネル調査で属性が判明している端末が全体の 10 パーセントであり、全体の姿ではないことを回答に添えてください。コマーシャルへの接触を含む集計を返すときは、放送の接触が視聴区間とスポットの放送時刻の重なりによる推定値であることを回答に添えてください。';
 
 -- =============================================================================
 -- 2. 番組とコマーシャルの説明文を検索できるようにする
@@ -344,12 +315,12 @@ SELECT * FROM SEMANTIC_VIEW(
 ORDER BY 3 DESC NULLS LAST
 LIMIT 10;
 
--- 増分リーチ
+-- 広告主別のリーチ、フリークエンシー、インプレッション
+-- リーチ × フリークエンシー = インプレッション になっていることを確認する
 SELECT * FROM SEMANTIC_VIEW(
   BCAST_VIEWING_HANDSON.MART.SV_BROADCAST_VIEWING
-  METRICS campaign.broadcast_reach, campaign.streaming_only_reach,
-          campaign.combined_reach, campaign.incremental_reach, incremental_reach_pct
-  DIMENSIONS campaign.campaign_advertiser
+  METRICS cm_contact.contact_reach, avg_frequency, cm_contact.impressions
+  DIMENSIONS cm_contact.advertiser
 )
 ORDER BY 2 DESC NULLS LAST
 LIMIT 10;

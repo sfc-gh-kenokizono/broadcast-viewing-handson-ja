@@ -26,19 +26,13 @@ models:
           - not_null
 
   - name: int_cm_contact
-    description: 放送されたコマーシャルへの接触
+    description: |
+      放送されたコマーシャルへの接触。視聴区間にスポットの放送時刻が入って
+      いたかどうかで判定した推定値であり、実測ではない。
     columns:
       - name: CM_ID
         tests:
           - not_null
-
-  - name: int_ad_contact
-    description: 放送と配信の接触を同じ形に揃えたもの
-    columns:
-      - name: CHANNEL_TYPE
-        tests:
-          - accepted_values:
-              values: ['broadcast', 'streaming']
 
   - name: int_viewing_minutes
     description: |

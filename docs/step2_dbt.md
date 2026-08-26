@@ -48,19 +48,16 @@ dbt/
 │   └── generate_schema_name.sql        スキーマ名の決め方の上書き
 └── models/
     ├── staging/                        クレンジング
-    │   ├── stg_viewing_log.sql
-    │   └── stg_streaming_log.sql
+    │   └── stg_viewing_log.sql
     ├── intermediate/                   中間処理
     │   ├── int_device_identity.sql
     │   ├── int_viewing_program.sql
     │   ├── int_cm_contact.sql
-    │   ├── int_ad_contact.sql
     │   └── int_viewing_minutes.sql
     └── marts/                          指標のもとになるファクト
         ├── mart_device_daily.sql
         ├── mart_program_viewing.sql
         ├── mart_frequency.sql
-        ├── mart_incremental_reach.sql
         └── mart_zapping_transition.sql
 ```
 
@@ -87,7 +84,7 @@ dbt/
 
 ## 4. 実行する
 
-コマンドの一覧から Run を選び、実行ボタンを押します。12 個のモデルが順番に作られます。XSMALL のウェアハウスで 1 分程度です。
+コマンドの一覧から Run を選び、実行ボタンを押します。9 個のモデルが順番に作られます。XSMALL のウェアハウスで 30 秒程度です。
 
 できあがったものを確認します。ワークスペースの中に SQL ファイルを新規作成して実行してください。
 
@@ -108,7 +105,6 @@ SHOW TABLES IN SCHEMA BCAST_VIEWING_HANDSON.MART;
 | `mart_device_daily` | 1 台 × 1 日 × 1 局 |
 | `mart_program_viewing` | 1 番組の放送回 × 1 台 |
 | `mart_frequency` | 1 つのコマーシャル × 1 台 |
-| `mart_incremental_reach` | 1 つのコマーシャル |
 | `mart_zapping_transition` | 1 日 × 移動元の局 × 移動先の局 |
 
 日別のリーチをあらかじめ計算して持っていないのは、そうすると**足せなくなる**からです。日別のリーチを月合計しようとして足し算すると、両方の日に見た人を 2 回数えてしまいます。
@@ -203,9 +199,9 @@ SELECT
 ```
 
 ```
-分解前の行数    1,049,977
-分解後の行数   11,054,837
-平均の視聴区間長   10.5 分
+分解前の行数    1,049,987
+分解後の行数   11,871,026
+平均の視聴区間長   11.3 分
 ```
 
 分解後の行数は、分解前の行数に平均の視聴区間長を掛けた値とほぼ一致します。**平均が M 分なら行数はおよそ M 倍**という関係です。
@@ -238,24 +234,37 @@ LIMIT 10;
 
 推計視聴人数は、視聴世帯数に 1 世帯あたりの想定人数 2.2 を掛けた便宜的な値です。このデータには世帯の人数が入っていないためです。実際にはパネル調査などを正解データにして受信機ごとに人数と属性を割り当てる処理で求めますが、そこは差し替えられる 1 か所として単純な係数にしてあります。
 
-## 10. 増分リーチを見る
+## 10. リーチとフリークエンシーとインプレッション
 
 ```sql
 SELECT
-  ADVERTISER              AS "広告主",
-  BROADCAST_REACH         AS "放送のリーチ",
-  STREAMING_ONLY_REACH    AS "配信だけで届いた人",
-  COMBINED_REACH          AS "合計のリーチ",
-  INCREMENTAL_REACH_PCT   AS "増えた割合（％）",
-  COMBINED_FREQUENCY      AS "フリークエンシー"
-FROM BCAST_VIEWING_HANDSON.MART.MART_INCREMENTAL_REACH
-ORDER BY BROADCAST_REACH DESC
+  ADVERTISER                                     AS "広告主",
+  MIN(CAMPAIGN_FROM)                             AS "出稿開始",
+  MAX(CAMPAIGN_TO)                               AS "出稿終了",
+  COUNT(DISTINCT COMMON_ID)                      AS "リーチ",
+  ROUND(SUM(CONTACT_COUNT) / COUNT(DISTINCT COMMON_ID), 2) AS "フリークエンシー",
+  SUM(CONTACT_COUNT)                             AS "インプレッション"
+FROM BCAST_VIEWING_HANDSON.MART.MART_FREQUENCY
+GROUP BY ADVERTISER
+ORDER BY "インプレッション" DESC
 LIMIT 10;
 ```
 
-放送だけで届いていた人に配信を足したとき、重複を除いてどれだけ広がるかが出ます。
+この 3 つは独立した指標ではありません。
 
-この指標は、放送と配信のデータが 1 か所にそろっていないと計算できません。別々の場所にあると、どちらでも届いた人を 1 人として数えられないためです。
+```
+リーチ × 平均フリークエンシー = インプレッション
+```
+
+3 つのうち 2 つが決まれば残りが決まる関係です。上の結果で掛け算して確かめてみてください。
+
+ここで注意が 1 つあります。**フリークエンシーの分母は接触した台数**です。全台数（2 万台）で割ってしまうと、接触していない台を分母に入れることになり、上の関係式が成り立ちません。
+
+また、放送の接触は**推定値**です。「誰がコマーシャルを見たか」というログは存在しないので、視聴区間にスポットの放送時刻が入っていたかで判定しています。席を外していても接触として数えます。この数字を社外に出すときには、必ず断り書きが必要になります。
+
+### 出稿期間で絞ってみる
+
+コマーシャルには 2 週間から 4 週間の出稿期間があります。`CAMPAIGN_FROM` と `CAMPAIGN_TO` で絞れば、キャンペーン単位の数字になります。実務で広告主に返すのはこの形です。
 
 ## 11. 属性が分かっている範囲だけの集計
 

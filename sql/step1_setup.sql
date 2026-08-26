@@ -206,8 +206,10 @@ CREATE OR REPLACE TABLE CM_MASTER (
   ADVERTISER     VARCHAR(40),
   CATEGORY       VARCHAR(20),
   DURATION_SEC   NUMBER(4,0),
-  CREATIVE_DESC  VARCHAR(400) COMMENT '素材の説明文。第 3 章で検索サービスの対象にする'
-) COMMENT = 'コマーシャルのマスタ';
+  CREATIVE_DESC  VARCHAR(400) COMMENT '素材の説明文。第 3 章で検索サービスの対象にする',
+  CAMPAIGN_FROM  DATE COMMENT '出稿期間の開始日',
+  CAMPAIGN_TO    DATE COMMENT '出稿期間の終了日'
+) COMMENT = 'コマーシャルのマスタ。出稿は 2 週間から 4 週間の期間で行われる';
 
 CREATE OR REPLACE TABLE CM_SPOT (
   SPOT_ID     VARCHAR(12),
@@ -215,26 +217,6 @@ CREATE OR REPLACE TABLE CM_SPOT (
   NETWORK_ID  VARCHAR(4),
   AIR_AT      TIMESTAMP_NTZ
 ) COMMENT = 'コマーシャルが放送された時刻';
-
--- -----------------------------------------------------------------------------
--- 配信側のデータ
--- -----------------------------------------------------------------------------
-CREATE OR REPLACE TABLE STREAMING_LOG (
-  COMMON_ID    VARCHAR(12),
-  IP_ADDRESS   VARCHAR(15),
-  PROGRAM_ID   VARCHAR(8),
-  DEVICE_TYPE  VARCHAR(12),
-  VIEW_FROM    TIMESTAMP_NTZ,
-  VIEW_TO      TIMESTAMP_NTZ
-) COMMENT = '配信側の番組視聴ログ';
-
-CREATE OR REPLACE TABLE STREAMING_AD_LOG (
-  IMP_ID       VARCHAR(14),
-  CM_ID        VARCHAR(8),
-  COMMON_ID    VARCHAR(12),
-  DEVICE_TYPE  VARCHAR(12),
-  IMP_AT       TIMESTAMP_NTZ
-) COMMENT = '配信側の広告表示ログ。放送側の接触と突き合わせて増分リーチを出す';
 
 -- -----------------------------------------------------------------------------
 -- パネル調査で属性が判明している端末
@@ -263,8 +245,6 @@ COPY INTO PROGRAM_MASTER      FROM @BCAST_VIEWING_HANDSON.INTEGRATIONS.BCAST_REP
 COPY INTO PROGRAM_SCHEDULE    FROM @BCAST_VIEWING_HANDSON.INTEGRATIONS.BCAST_REPO/branches/main/data/program_schedule.csv.gz    FILE_FORMAT = (FORMAT_NAME = CSV_UTF8);
 COPY INTO CM_MASTER           FROM @BCAST_VIEWING_HANDSON.INTEGRATIONS.BCAST_REPO/branches/main/data/cm_master.csv.gz           FILE_FORMAT = (FORMAT_NAME = CSV_UTF8);
 COPY INTO CM_SPOT             FROM @BCAST_VIEWING_HANDSON.INTEGRATIONS.BCAST_REPO/branches/main/data/cm_spot.csv.gz             FILE_FORMAT = (FORMAT_NAME = CSV_UTF8);
-COPY INTO STREAMING_LOG       FROM @BCAST_VIEWING_HANDSON.INTEGRATIONS.BCAST_REPO/branches/main/data/streaming_log.csv.gz       FILE_FORMAT = (FORMAT_NAME = CSV_UTF8);
-COPY INTO STREAMING_AD_LOG    FROM @BCAST_VIEWING_HANDSON.INTEGRATIONS.BCAST_REPO/branches/main/data/streaming_ad_log.csv.gz    FILE_FORMAT = (FORMAT_NAME = CSV_UTF8);
 COPY INTO PANEL_DEMOGRAPHICS  FROM @BCAST_VIEWING_HANDSON.INTEGRATIONS.BCAST_REPO/branches/main/data/panel_demographics.csv.gz  FILE_FORMAT = (FORMAT_NAME = CSV_UTF8);
 
 -- =============================================================================
@@ -281,8 +261,6 @@ UNION ALL SELECT 'PROGRAM_MASTER',     COUNT(*) FROM PROGRAM_MASTER
 UNION ALL SELECT 'PROGRAM_SCHEDULE',   COUNT(*) FROM PROGRAM_SCHEDULE
 UNION ALL SELECT 'CM_MASTER',          COUNT(*) FROM CM_MASTER
 UNION ALL SELECT 'CM_SPOT',            COUNT(*) FROM CM_SPOT
-UNION ALL SELECT 'STREAMING_LOG',      COUNT(*) FROM STREAMING_LOG
-UNION ALL SELECT 'STREAMING_AD_LOG',   COUNT(*) FROM STREAMING_AD_LOG
 UNION ALL SELECT 'PANEL_DEMOGRAPHICS', COUNT(*) FROM PANEL_DEMOGRAPHICS
 ORDER BY TABLE_NAME;
 

@@ -10,12 +10,17 @@ Git リポジトリステージ経由で COPY INTO する。
     python3 scripts/generate_data.py --viewing-per-network 100000 --seed 7
 
 設計の意図:
+  - 対象は地上波 5 局の非特定視聴データだけ。配信（見逃し）は含めない。
+    放送と配信を紐付けるには名寄せが必要で、そこが最大の論点になるため、
+    名寄せ済みを前提にしたデータは作らない。
   - 1 行 = 1 視聴区間（from-to）。放送の非特定視聴データの粒度に合わせる。
   - ID は 3 階層（各局 ID / 共通 ID / IP アドレス）。各局 ID は局をまたいで一致しない。
   - 属性は 10 パーセントの端末にしか存在しない。世帯人数も個人属性も視聴ログには入れない。
   - 視聴は番組の放送枠に紐づけて発生させる。そうしないと番組別の集計が意味を持たない。
   - 端末の嗜好は「強すぎない」ようにする。作られたデータに見えないための調整。
   - クレンジングの章が空回りしないよう、異常値と欠落を意図的に混ぜる。
+  - コマーシャルには出稿期間を持たせる。実際の出稿は常に流れ続けるのではなく、
+    2 週間から 4 週間の枚を買う形になるため。
 """
 
 from __future__ import annotations
@@ -219,8 +224,6 @@ POSTAL_PREFIXES = [
     "370", "371", "373", "374", "376", "379", "380", "400", "420", "440",
 ]
 
-DEVICE_TYPES = [("mobile", 52), ("pc", 22), ("tablet", 14), ("ctv", 12)]
-
 
 def weighted_choice(rng: random.Random, pairs):
     """(value, weight) の並びから 1 つ選ぶ。"""
@@ -249,8 +252,8 @@ def date_trend(d: date, start_factor: float, end_factor: float) -> float:
     """期間の中で少しずつ変えるための係数。
 
     3 ヶ月分を用意しても、どの日も同じ量なら月次の推移が平らになり、
-    蓄積していくデータを見る意味がなくなる。放送は微減、配信は伸びるという
-    実際に議論になる形になるよう、逆向きの係数をかけている。
+    蓄積していくデータを見る意味がなくなる。放送の視聴が期間の後半に
+    かけてゆるやかに減る形にして、月次の推移が読めるようにしている。
     """
     if PERIOD_DAYS == 0:
         return start_factor
@@ -319,11 +322,6 @@ def build_devices(rng: random.Random, n_devices: int, n_ips: int):
         ip = slots[i]
         # 視聴の多い家と少ない家の差を付ける。1 に近いほどよく見る。
         activity = rng.betavariate(2.0, 3.0) * 0.9 + 0.1
-        # 配信を見るかどうかを activity と逆相関にする。
-        # テレビをあまり見ない層が配信で見ているという想定。
-        # ここを独立にすると、配信で接触する人がすでに放送でも接触済みになり、
-        # 増分リーチがほぼゼロになって指標として意味をなさない。
-        streaming = rng.random() < (0.85 - 0.7 * activity)
         # よく見る局の順位を受信機ごとにシャッフルして重みを割り当てる
         order = network_ids[:]
         rng.shuffle(order)
@@ -334,7 +332,6 @@ def build_devices(rng: random.Random, n_devices: int, n_ips: int):
             "postal_code": ip_postal[ip],
             "activity": activity,
             "segment": None,          # あとでパネル分だけ埋める
-            "streaming": streaming,
             "nw_affinity": dict(zip(order, weights)),
         })
     return devices, ip_postal
@@ -509,69 +506,44 @@ def inject_anomalies(rng: random.Random, by_network):
     return counts
 
 
-def build_streaming(rng: random.Random, devices, programs, n_logs: int):
-    pool = [d for d in devices if d["streaming"]]
-    prog_weights = [TIME_SLOTS[p["time_slot"]]["weight"] for p in programs]
-    dev_types = [t for t, _ in DEVICE_TYPES]
-    dev_type_weights = [w for _, w in DEVICE_TYPES]
-    duration_values = [3, 7, 12, 20, 30, 45]
-    duration_weights = [22, 24, 20, 16, 12, 6]
-    hours = [7, 8, 12, 13, 18, 19, 20, 21, 22, 23]
-    # 配信は期間の後半に重みを置く（伸びている側）
-    all_dates = list(dates_in_period())
-    date_weights = [date_trend(d, 0.7, 1.3) for d in all_dates]
-
-    rows = []
-    batch = 20000
-    while len(rows) < n_logs:
-        picked_devs = rng.choices(pool, k=batch)
-        picked_progs = rng.choices(programs, weights=prog_weights, k=batch)
-        picked_durations = rng.choices(duration_values, weights=duration_weights, k=batch)
-        picked_types = rng.choices(dev_types, weights=dev_type_weights, k=batch)
-        picked_dates = rng.choices(all_dates, weights=date_weights, k=batch)
-        for dev, p, duration, dtype, d in zip(picked_devs, picked_progs,
-                                              picked_durations, picked_types, picked_dates):
-            accept = 0.6 * genre_affinity(dev, p["genre"]) * dev["nw_affinity"][p["network_id"]]
-            if rng.random() > min(1.0, accept):
-                continue
-            start = datetime(d.year, d.month, d.day, rng.choice(hours), rng.randint(0, 59))
-            rows.append([
-                dev["common_id"],
-                dev["ip"],
-                p["program_id"],
-                dtype,
-                start.strftime("%Y-%m-%d %H:%M:%S"),
-                (start + timedelta(minutes=duration)).strftime("%Y-%m-%d %H:%M:%S"),
-            ])
-            if len(rows) >= n_logs:
-                break
-    return rows
-
-
 def build_cm(rng: random.Random, schedule, n_spots: int):
     """コマーシャルのマスタと放送実績。
 
-    スポット本数を増やしすぎると、放送だけでほぼ全部の受信機に届いてしまい、
-    配信を追加しても増える余地がなくなる。増分リーチが指標として意味を持つよう、
-    1 つのコマーシャルあたりの本数を押さえてある。
+    実際の出稿には期間があります。3 ヶ月ずっと同じコマーシャルが同じ本数
+    流れ続けることはなく、2 週間から 4 週間の枠を買って集中的に打ちます。
+    ここで期間を持たせておくと、「6 月のこのキャンペーンは何台に届いたか」
+    という実務の聞き方がそのまま成立します。
+
     CM0001 だけは本数を多めにして、フリークエンシーの分布に差を作る。
     """
+    cm_ids = [f"CM{i + 1:04d}" for i in range(len(ADVERTISERS))]
+
+    # コマーシャルごとの出稿期間。期間の長さは 2 週間から 4 週間。
+    campaign = {}
+    for cm_id in cm_ids:
+        length = rng.choice([14, 21, 28])
+        start = PERIOD_START + timedelta(days=rng.randint(0, max(0, PERIOD_DAYS - length)))
+        campaign[cm_id] = (start, start + timedelta(days=length - 1))
+
     master = []
     for idx, (category, advertiser, desc) in enumerate(ADVERTISERS):
+        cm_id = f"CM{idx + 1:04d}"
+        c_from, c_to = campaign[cm_id]
         master.append([
-            f"CM{idx + 1:04d}",
+            cm_id,
             advertiser,
             category,
             weighted_choice(rng, [(15, 70), (30, 25), (6, 5)]),
             desc,
+            c_from.isoformat(),
+            c_to.isoformat(),
         ])
 
-    cm_ids = [f"CM{i + 1:04d}" for i in range(len(ADVERTISERS))]
     cm_weights = [90 if i == 0 else 30 for i in range(len(ADVERTISERS))]
 
     # 実際の出稿は「この局のこの時間帯の枠を買う」形になる。
-    # 全局・全時間帯にばらまくと放送だけでほぼ全部の受信機に届いてしまい、
-    # 配信を追加しても増える余地がなくなる。
+    # 全局・全時間帯にばらまくと、どのコマーシャルもほぼ全部の受信機に届いてしまい、
+    # リーチとフリークエンシーに差が出なくなる。
     slot_names = ["ゴールデン", "夕方", "深夜", "朝", "昼"]
     network_ids = [n[0] for n in NETWORKS]
     cm_target = {
@@ -583,11 +555,18 @@ def build_cm(rng: random.Random, schedule, n_spots: int):
     for s in schedule:
         by_target.setdefault((s["network_id"], s["time_slot"]), []).append(s)
 
+    # 買った枠のうち、出稿期間に入っているものだけを候補にする
+    candidates_of = {}
+    for cm_id in cm_ids:
+        c_from, c_to = campaign[cm_id]
+        slots = by_target.get(cm_target[cm_id]) or schedule
+        in_window = [s for s in slots if c_from <= s["air_date"] <= c_to]
+        candidates_of[cm_id] = in_window or slots
+
     picked_cms = rng.choices(cm_ids, weights=cm_weights, k=n_spots)
     spots = []
     for i, cm_id in enumerate(picked_cms):
-        candidates = by_target.get(cm_target[cm_id]) or schedule
-        slot = rng.choice(candidates)
+        slot = rng.choice(candidates_of[cm_id])
         span_min = int((slot["air_to"] - slot["air_from"]).total_seconds() // 60)
         air_at = slot["air_from"] + timedelta(minutes=rng.randint(0, max(0, span_min - 1)))
         spots.append([
@@ -599,34 +578,6 @@ def build_cm(rng: random.Random, schedule, n_spots: int):
     return master, spots
 
 
-def build_streaming_ads(rng: random.Random, devices, n_imps: int):
-    pool = [d for d in devices if d["streaming"]]
-    cm_ids = [f"CM{i + 1:04d}" for i in range(len(ADVERTISERS))]
-    cm_weights = [90 if i == 0 else 30 for i in range(len(ADVERTISERS))]
-    dev_types = [t for t, _ in DEVICE_TYPES]
-    dev_type_weights = [w for _, w in DEVICE_TYPES]
-
-    picked_devs = rng.choices(pool, k=n_imps)
-    picked_cms = rng.choices(cm_ids, weights=cm_weights, k=n_imps)
-    picked_types = rng.choices(dev_types, weights=dev_type_weights, k=n_imps)
-    all_dates = list(dates_in_period())
-    date_weights = [date_trend(d, 0.7, 1.3) for d in all_dates]
-    picked_dates = rng.choices(all_dates, weights=date_weights, k=n_imps)
-    rows = []
-    for i, (dev, cm_id, dtype, d) in enumerate(zip(picked_devs, picked_cms,
-                                                   picked_types, picked_dates)):
-        imp_at = datetime(d.year, d.month, d.day, rng.randint(6, 23), rng.randint(0, 59),
-                          rng.randint(0, 59))
-        rows.append([
-            f"IMP{i + 1:09d}",
-            cm_id,
-            dev["common_id"],
-            dtype,
-            imp_at.strftime("%Y-%m-%d %H:%M:%S"),
-        ])
-    return rows
-
-
 def main():
     parser = argparse.ArgumentParser(description="ハンズオン用サンプルデータの生成")
     parser.add_argument("--seed", type=int, default=7)
@@ -634,8 +585,6 @@ def main():
     parser.add_argument("--ips", type=int, default=12000, help="IP アドレスの数")
     parser.add_argument("--viewing-total", type=int, default=1050000,
                         help="視聴区間の合計行数。局ごとの配分は NETWORK_SHARE に従う")
-    parser.add_argument("--streaming-logs", type=int, default=240000)
-    parser.add_argument("--streaming-ads", type=int, default=45000)
     parser.add_argument("--cm-spots", type=int, default=750)
     parser.add_argument("--panel", type=int, default=2000)
     parser.add_argument("--no-compress", action="store_true")
@@ -652,9 +601,7 @@ def main():
     panel_rows = assign_panel(rng, devices, args.panel)
     viewing = build_viewing_logs(rng, devices, schedule, args.viewing_total)
     anomaly_counts = inject_anomalies(rng, viewing)
-    streaming = build_streaming(rng, devices, programs, args.streaming_logs)
     cm_master, cm_spots = build_cm(rng, schedule, args.cm_spots)
-    streaming_ads = build_streaming_ads(rng, devices, args.streaming_ads)
 
     print("\n書き出しています ...")
     for network_id, _, _ in NETWORKS:
@@ -684,20 +631,13 @@ def main():
               compress)
 
     write_csv("cm_master.csv",
-              ["CM_ID", "ADVERTISER", "CATEGORY", "DURATION_SEC", "CREATIVE_DESC"],
+              ["CM_ID", "ADVERTISER", "CATEGORY", "DURATION_SEC", "CREATIVE_DESC",
+               "CAMPAIGN_FROM", "CAMPAIGN_TO"],
               cm_master, compress)
 
     write_csv("cm_spot.csv",
               ["SPOT_ID", "CM_ID", "NETWORK_ID", "AIR_AT"],
               cm_spots, compress)
-
-    write_csv("streaming_log.csv",
-              ["COMMON_ID", "IP_ADDRESS", "PROGRAM_ID", "DEVICE_TYPE", "VIEW_FROM", "VIEW_TO"],
-              streaming, compress)
-
-    write_csv("streaming_ad_log.csv",
-              ["IMP_ID", "CM_ID", "COMMON_ID", "DEVICE_TYPE", "IMP_AT"],
-              streaming_ads, compress)
 
     write_csv("panel_demographics.csv",
               ["COMMON_ID", "GENDER_AGE_SEGMENT", "SURVEY_DATE"],
