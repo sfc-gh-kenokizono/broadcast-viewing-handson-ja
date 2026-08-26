@@ -21,17 +21,24 @@
 
 Snowsight でワークシートを新規作成し、このファイルの内容を貼り付けてから、上から順に実行していきます。
 
-## 書き換えが必要な 3 か所
+## 書き換えは必要ありません
 
-実行する前に、ファイル内の 3 か所を書き換えてください。
+リポジトリは公開してあるので、**認証情報は不要**です。GitHub のアカウントもトークンも用意せずに、そのまま上から実行してください。
 
-| 場所 | 書き換える内容 |
-|---|---|
-| `CREATE OR REPLACE SECRET` の `USERNAME` | GitHub のユーザー名 |
-| `CREATE OR REPLACE SECRET` の `PASSWORD` | GitHub の個人アクセストークン |
-| `API_ALLOWED_PREFIXES` と `ORIGIN` の URL | リポジトリを置いている GitHub のユーザー名または組織名 |
+自分のリポジトリに置き換えて実施したい場合は、`sql/step1_setup.sql` の末尾に「非公開リポジトリを使う場合」の手順をコメントで書いてあります。
 
-個人アクセストークンの作り方は、GitHub の Settings から Developer settings、Personal access tokens と進み、このリポジトリの読み取り権限だけを付けたトークンを発行してください。
+### API 統合は公開リポジトリでも必要です
+
+認証情報が不要になっても、`API INTEGRATION` は省略できません。
+
+```sql
+CREATE OR REPLACE API INTEGRATION BCAST_GIT_API
+  API_PROVIDER = git_https_api
+  API_ALLOWED_PREFIXES = ('https://github.com/sfc-gh-kenokizono')
+  ENABLED = TRUE;
+```
+
+`API_ALLOWED_PREFIXES` は「このアカウントから外に出ていってよい先」の宣言です。ここに書いていないドメインには接続できません。外部との通信を管理者が宣言した先に限定できる、というのがこの仕組みの意図です。
 
 ## 層の分け方について
 

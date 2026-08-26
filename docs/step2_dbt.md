@@ -28,11 +28,10 @@ dbt Core をお使いになったことがあれば、書くもの（`dbt_projec
 
 | 項目 | 値 |
 |---|---|
-| Repository URL | `https://github.com/<ユーザー名>/broadcast-viewing-handson-ja.git` |
+| Repository URL | `https://github.com/sfc-gh-kenokizono/broadcast-viewing-handson-ja.git` |
 | Workspace name | `bcast_viewing` |
 | API integration | `BCAST_GIT_API` |
-| 認証方式 | Personal access token |
-| Credentials secret | `BCAST_VIEWING_HANDSON` の `INTEGRATIONS` にある `BCAST_GIT_SECRET` |
+| 認証方式 | なし（公開リポジトリなので認証情報は不要です） |
 
 4. Create を選びます
 

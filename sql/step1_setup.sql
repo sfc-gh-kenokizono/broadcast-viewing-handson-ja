@@ -11,8 +11,8 @@
 --   4. リポジトリの CSV を RAW スキーマに読み込む
 --
 -- 事前に決めておくこと
---   GitHub のユーザー名と個人アクセストークン（リポジトリの読み取り権限）
---   下の <> の 3 か所を書き換えてから実行してください。
+--   ありません。教材のリポジトリは公開してあるため、GitHub のアカウントも
+--   個人アクセストークンも不要で、このファイルはそのまま上から実行できます。
 -- =============================================================================
 
 USE ROLE ACCOUNTADMIN;
@@ -101,31 +101,27 @@ GRANT SELECT ON FUTURE VIEWS  IN SCHEMA BCAST_VIEWING_HANDSON.MART TO ROLE BCAST
 -- =============================================================================
 -- 3. GitHub リポジトリに接続する
 -- =============================================================================
--- 非公開リポジトリなので、認証情報をシークレットとして登録し、
--- API 統合からそのシークレットを使えるようにします。
--- シークレットに入れた値は SQL から取り出すことはできません。
+-- このリポジトリは公開されているので、認証情報は必要ありません。
+-- API 統合だけを作れば、Snowflake からリポジトリの中身をステージとして
+-- 参照できるようになります。
+--
+-- 非公開リポジトリを使う場合は、この章の末尾に手順を書いてあります。
 
 USE SCHEMA BCAST_VIEWING_HANDSON.INTEGRATIONS;
 
-CREATE OR REPLACE SECRET BCAST_GIT_SECRET
-  TYPE = password
-  USERNAME = '<GitHub のユーザー名>'
-  PASSWORD = '<GitHub の個人アクセストークン>';
-
+-- どのドメインに出ていってよいかを宣言する。ここに書いていない先には接続できません。
 CREATE OR REPLACE API INTEGRATION BCAST_GIT_API
   API_PROVIDER = git_https_api
-  API_ALLOWED_PREFIXES = ('https://github.com/<GitHub のユーザー名または組織名>')
-  ALLOWED_AUTHENTICATION_SECRETS = (BCAST_VIEWING_HANDSON.INTEGRATIONS.BCAST_GIT_SECRET)
+  API_ALLOWED_PREFIXES = ('https://github.com/sfc-gh-kenokizono')
   ENABLED = TRUE;
 
 GRANT USAGE ON INTEGRATION BCAST_GIT_API TO ROLE BCAST_ENGINEER;
 GRANT USAGE ON SCHEMA BCAST_VIEWING_HANDSON.INTEGRATIONS TO ROLE BCAST_ENGINEER;
-GRANT READ ON SECRET BCAST_GIT_SECRET TO ROLE BCAST_ENGINEER;
 
+-- 公開リポジトリなので GIT_CREDENTIALS を指定しません
 CREATE OR REPLACE GIT REPOSITORY BCAST_REPO
   API_INTEGRATION = BCAST_GIT_API
-  GIT_CREDENTIALS = BCAST_VIEWING_HANDSON.INTEGRATIONS.BCAST_GIT_SECRET
-  ORIGIN = 'https://github.com/<GitHub のユーザー名または組織名>/broadcast-viewing-handson-ja.git';
+  ORIGIN = 'https://github.com/sfc-gh-kenokizono/broadcast-viewing-handson-ja.git';
 
 GRANT READ ON GIT REPOSITORY BCAST_REPO TO ROLE BCAST_ENGINEER;
 
@@ -303,6 +299,33 @@ FROM (
 WHERE VIEW_FROM::DATE BETWEEN '2026-07-15' AND '2026-07-19'
 GROUP BY 1, 2
 ORDER BY 2, 1;
+
+-- =============================================================================
+-- 補足: 非公開リポジトリを使う場合
+-- =============================================================================
+-- 自分のリポジトリに置き換えて実施する場合など、非公開リポジトリを参照するには
+-- 認証情報をシークレットとして登録し、それを API 統合とリポジトリの両方から
+-- 指定します。シークレットに入れた値は SQL から取り出すことはできません。
+--
+-- CREATE OR REPLACE SECRET BCAST_GIT_SECRET
+--   TYPE = password
+--   USERNAME = '<GitHub のユーザー名>'
+--   PASSWORD = '<GitHub の個人アクセストークン>';
+--
+-- CREATE OR REPLACE API INTEGRATION BCAST_GIT_API
+--   API_PROVIDER = git_https_api
+--   API_ALLOWED_PREFIXES = ('https://github.com/<ユーザー名または組織名>')
+--   ALLOWED_AUTHENTICATION_SECRETS = (BCAST_VIEWING_HANDSON.INTEGRATIONS.BCAST_GIT_SECRET)
+--   ENABLED = TRUE;
+--
+-- GRANT READ ON SECRET BCAST_GIT_SECRET TO ROLE BCAST_ENGINEER;
+--
+-- CREATE OR REPLACE GIT REPOSITORY BCAST_REPO
+--   API_INTEGRATION = BCAST_GIT_API
+--   GIT_CREDENTIALS = BCAST_VIEWING_HANDSON.INTEGRATIONS.BCAST_GIT_SECRET
+--   ORIGIN = 'https://github.com/<ユーザー名または組織名>/broadcast-viewing-handson-ja.git';
+--
+-- この場合、第 2 章でワークスペースを作るときにも同じシークレットを選びます。
 
 -- =============================================================================
 -- 第 1 章はここまでです。第 2 章（dbt）は docs/step2_dbt.md に進んでください。
