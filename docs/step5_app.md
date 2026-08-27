@@ -8,26 +8,57 @@
 
 やることは「Snowsight で新規作成してコードを貼る」だけです。ローカルへのインストールもコマンドライン操作も必要ありません。
 
+## 使うファイル
+
+`sql/step5_app.sql`
+
+ワークスペースの左側の一覧から `sql` フォルダを開き、このファイルを選んで上から順に実行します。**アプリのコードをコピーして貼り付ける必要はありません。**
+
 ## 手順
 
-1. Snowsight の左メニューで Projects、Streamlit を選びます
-2. 右上の Streamlit App を選びます
-3. 次のように設定します
+このファイルがやることは 2 つです。
 
-| 項目 | 値 |
-|---|---|
-| App title | 放送視聴データ |
-| App location | `BCAST_VIEWING_HANDSON` の `MART` |
-| App warehouse | `BCAST_HANDSON_WH` |
-| 画面右上のロール | `BCAST_ANALYST` |
+| # | やること | 何が起きるか |
+|---|---|---|
+| 1 | `COPY FILES` で `app` フォルダを内部ステージに移す | リポジトリにある `streamlit_app.py` がステージに置かれます |
+| 2 | `CREATE STREAMLIT` でアプリを作る | そのステージを指すアプリができます |
 
-ロールを `BCAST_ANALYST` にしてください。Streamlit は**作成したロールの権限で動きます**（所有者権限）。
-マート層を参照できるロールで作らないと、起動時に
-`Insufficient privileges to operate on table` で落ちます。
+実行が終わったら、Snowsight の左メニューで **Projects » Streamlit** を選びます。`BCAST_VIEWING_APP` が一覧に出てくるので、選ぶと起動します。
 
-4. Create を選ぶと編集画面が開きます
-5. 既定で入っているコードをすべて消し、[app/streamlit_app.py](../app/streamlit_app.py) の内容を貼り付けます
-6. 右上の Run を選びます
+### なぜ画面から作らないのか
+
+画面から作る場合は、アプリのコードを貼り付けることになります。リポジトリにコードがあるので、**そこから直接作ったほうが確実**です。実務でも、アプリのコードはリポジトリで管理して、そこから配置します。
+
+第 1 章で CSV を読み込んだときと同じ理由で、Git リポジトリのステージを直接アプリの置き場所には指定できません。`COPY FILES` で内部ステージに移してから指定します。
+
+### 所有者権限について
+
+Streamlit は**作成したロールの権限で動きます**（所有者権限）。このファイルは `ACCOUNTADMIN` で実行するので、`ACCOUNTADMIN` の権限で動きます。
+
+第 1 章でカスタムロールを `SYSADMIN` の下にぶら下げているため、`ACCOUNTADMIN` から `BCAST_ENGINEER` が作ったテーブルに到達できます。**あの `GRANT ROLE` を省くと、ここで `Insufficient privileges to operate on table` で落ちます。**
+
+権限の設計を間違えると動かない、という形で現れる箇所です。
+
+### コードを直したときの反映
+
+リポジトリのコードを直した場合は、次の順で反映します。
+
+```sql
+ALTER GIT REPOSITORY BCAST_VIEWING_HANDSON.INTEGRATIONS.BCAST_REPO FETCH;
+
+COPY FILES INTO @BCAST_VIEWING_HANDSON.MART.BCAST_APP_STAGE
+  FROM @BCAST_VIEWING_HANDSON.INTEGRATIONS.BCAST_REPO/branches/main/app/;
+```
+
+そのあとアプリの画面を再読み込みしてください。
+
+画面上で直したい場合は、アプリの画面から Edit を選ぶと編集できます。ただしその変更はリポジトリには戻りません。
+
+### 参考 ワークスペースから作る方法もあります
+
+ワークスペースの `+ Add new` から Streamlit アプリを作ることもできます。この場合は実行基盤がコンテナ（コンピュートプール）になり、ウェアハウスではなくコンピュートプールの使用時間で課金されます。新しく作り始めるときはこちらが便利です。
+
+このハンズオンでは、既存のコードをリポジトリから配置する形にしたいので、SQL で作る方法を採っています。
 
 ## 画面の中身
 

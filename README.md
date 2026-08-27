@@ -63,17 +63,38 @@ GitHub リポジトリ (CSV)
 
 ## 章の構成
 
-| # | 章 | 目安 | 手順書 | 実行する SQL |
+| # | 章 | 目安 | 手順書 | 実行するもの |
 |---|---|---|---|---|
-| 0 | 環境の確認 | 5 分 | [docs/step0_environment.md](docs/step0_environment.md) | [sql/step0_check.sql](sql/step0_check.sql) |
+| 0 | 環境の確認とワークスペースの用意 | 10 分 | [docs/step0_environment.md](docs/step0_environment.md) | [sql/step0_check.sql](sql/step0_check.sql) |
 | 1 | セットアップとデータの取り込み | 15 分 | [docs/step1_setup.md](docs/step1_setup.md) | [sql/step1_setup.sql](sql/step1_setup.sql) |
-| 2 | dbt でデータを変換する | 40 分 | [docs/step2_dbt.md](docs/step2_dbt.md) | ワークスペースの `dbt/` |
+| 2 | dbt でデータを変換する | 40 分 | [docs/step2_dbt.md](docs/step2_dbt.md) | `dbt/` のモデル |
 | 3 | セマンティックビューと検索サービス | 20 分 | [docs/step3_semantic.md](docs/step3_semantic.md) | [sql/step3_semantic.sql](sql/step3_semantic.sql) |
 | 4 | エージェントを作り自然言語で分析する | 20 分 | [docs/step4_cowork.md](docs/step4_cowork.md) | [sql/step4_agent.sql](sql/step4_agent.sql) |
-| 5 | 可視化アプリを作る | 10 分 | [docs/step5_app.md](docs/step5_app.md) | [app/streamlit_app.py](app/streamlit_app.py) |
+| 5 | 可視化アプリを作る | 10 分 | [docs/step5_app.md](docs/step5_app.md) | [sql/step5_app.sql](sql/step5_app.sql) |
 | 6 | アクセス権とマスキング | 15 分 | [docs/step6_rbac.md](docs/step6_rbac.md) | [sql/step6_rbac.sql](sql/step6_rbac.sql) |
 | 任意 | スケジュール実行の設定 | 10 分 | [docs/step2_dbt.md](docs/step2_dbt.md) の末尾 | — |
 | 片付け | 環境をすべて削除する | 2 分 | — | [sql/cleanup.sql](sql/cleanup.sql) |
+
+## 進め方
+
+**コピーと貼り付けは第 0 章だけです。**
+
+第 0 章で、教材のリポジトリを Snowsight のワークスペースに取り込みます。以降の章は、左側のファイル一覧から `sql/stepN_*.sql` を開いて実行するだけです。dbt のモデルもアプリのコードも、同じワークスペースの中にあります。
+
+```
+第 0 章  ワークシートに step0_check.sql を貼って実行（ここだけコピペ）
+           ↓  API 統合ができる
+         ワークスペースを作る（画面操作）
+           ↓  リポジトリの中身が全部そろう
+第 1 章  ワークスペースで sql/step1_setup.sql を開いて実行
+第 2 章  ワークスペースで dbt/ を動かす
+第 3 章  ワークスペースで sql/step3_semantic.sql を開いて実行
+第 4 章  ワークスペースで sql/step4_agent.sql を開いて実行
+第 5 章  ワークスペースで sql/step5_app.sql を開いて実行
+第 6 章  ワークスペースで sql/step6_rbac.sql を開いて実行
+```
+
+第 0 章でワークスペースを作るのは、そこから先で使うファイルをすべて手元に置くためです。Git リポジトリを参照する `API INTEGRATION` はアカウントに属するオブジェクトなので、データベースを作る前に用意できます。
 
 データの構造とカラムの意味は [docs/data_dictionary.md](docs/data_dictionary.md) にまとめています。
 
