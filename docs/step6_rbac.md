@@ -187,7 +187,7 @@ USE ROLE BCAST_NW01_VIEWER;  -- 1 局だけ
 
 ```yaml
 models:
-  bcast_viewing:
+  dbt:
     marts:
       +post-hook:
         - "ALTER TABLE {{ this }} MODIFY COLUMN IP_ADDRESS SET MASKING POLICY ..."
