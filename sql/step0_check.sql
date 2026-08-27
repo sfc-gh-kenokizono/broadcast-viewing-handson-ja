@@ -59,8 +59,13 @@ USE WAREHOUSE COMPUTE_WH;
 -- 3. Cortex が使えることを確認する
 -- =============================================================================
 -- 第 3 章以降で使う AI 機能が、このアカウントで利用できるかを確認します。
+--
+-- 関数名について
+--   AI_COMPLETE を使います。以前は SNOWFLAKE.CORTEX.COMPLETE と書きましたが、
+--   そちらは後方互換のために残されている旧名で、2026 年内に廃止予定です。
+--   新しく書くものは AI_COMPLETE を使ってください。名前空間の接頭辞は要りません。
 
-SELECT SNOWFLAKE.CORTEX.COMPLETE(
+SELECT AI_COMPLETE(
   'claude-sonnet-4-5',
   '一言で自己紹介してください'
 ) AS "応答";
