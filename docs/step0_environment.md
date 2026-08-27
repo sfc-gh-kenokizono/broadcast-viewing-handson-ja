@@ -97,27 +97,21 @@ SELECT AI_COMPLETE(
 SHOW PARAMETERS LIKE 'CORTEX_ENABLED_CROSS_REGION' IN ACCOUNT;
 ```
 
-### 関数名について
+## 4. ワークスペースを開けることを確認する
 
-`AI_COMPLETE` を使います。以前は `SNOWFLAKE.CORTEX.COMPLETE` と書いていましたが、そちらは後方互換のために残されている旧名で、[公式ドキュメント](https://docs.snowflake.com/en/sql-reference/functions/complete-snowflake-cortex)に「2026 年内に廃止予定」と明記されています。新しく書くものは `AI_COMPLETE` を使ってください。名前空間の接頭辞は要りません。
+第 2 章では Snowsight のワークスペースで dbt を動かします。**事前の有効化は必要ありません。** 初めてワークスペースを開いたときに、そのユーザー専用の個人データベースが自動で作られます。
 
-同じ整理が他の関数にも入っています。`SNOWFLAKE.CORTEX.SENTIMENT` は `AI_SENTIMENT`、`SNOWFLAKE.CORTEX.CLASSIFY_TEXT` は `AI_CLASSIFY` に置き換わっています。お客様の既存コードを見るときに気づけると印象が良いところです。
+Snowsight の左メニューで Projects の下の Workspaces を開き、画面が出ることだけ確認してください。SQL での確認は不要です。
 
-## 4. ワークスペースが使えることを確認する
+個人データベースについて知っておくとよいこと。
 
-第 2 章では Snowsight のワークスペースで dbt を動かします。ワークスペースは個人データベースの中に作られるため、アカウントでこの機能が有効になっている必要があります。
-
-```sql
-SHOW PARAMETERS LIKE 'ENABLE_PERSONAL_DATABASE' IN ACCOUNT;
-```
-
-`value` が `true` であれば有効です。`false` の場合は次を実行してください。
-
-```sql
-ALTER ACCOUNT SET ENABLE_PERSONAL_DATABASE = TRUE;
-```
-
-画面から確認する場合は、Snowsight の左メニューで Projects の下に Workspaces が表示されていれば有効です。
+| 項目 | 内容 |
+|---|---|
+| 作られるタイミング | ユーザーが初めてワークスペースを開いたとき（自動） |
+| 名前 | `USER$<ユーザー名>` |
+| 中に置けるもの | ワークスペース、Git リポジトリ、シークレット、スキーマなど |
+| 中に置けないもの | テーブルやビューなどの通常のデータオブジェクト |
+| 権限 | 実行時の権限はそのユーザーが持っているロールのまま。新しいデータアクセスは増えない |
 
 ## 5. 使う容量の目安
 
@@ -128,8 +122,8 @@ ALTER ACCOUNT SET ENABLE_PERSONAL_DATABASE = TRUE;
 ## 動作確認
 
 - ロールが `ACCOUNTADMIN` になっている
-- Cortex の呼び出しが文章を返す
-- `ENABLE_PERSONAL_DATABASE` が `true`
+- `AI_COMPLETE` の呼び出しが文章を返す
+- Snowsight で Workspaces の画面が開ける
 
 ## 次へ
 
