@@ -1,4 +1,4 @@
-name: 'dbt'
+name: 'bcast_dbt'
 version: '1.0.0'
 config-version: 2
 profile: 'bcast'
@@ -15,7 +15,7 @@ clean-targets:
 # staging と intermediate はビューにして、必要になったときに計算する。
 # marts は可視化アプリやエージェントが繰り返し参照するのでテーブルにする。
 models:
-  dbt:
+  bcast_dbt:
     staging:
       +schema: STG
       +materialized: view
