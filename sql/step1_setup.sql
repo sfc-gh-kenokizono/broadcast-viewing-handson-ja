@@ -11,8 +11,9 @@
 --   4. リポジトリの CSV を RAW スキーマに読み込む
 --
 -- 事前に決めておくこと
---   ありません。教材のリポジトリは公開してあるため、GitHub のアカウントも
---   個人アクセストークンも不要で、このファイルはそのまま上から実行できます。
+--   ありません。第 0 章でワークスペースを作ってあるので、左側の一覧から
+--   このファイルを開いて、そのまま上から実行できます。
+--   コピーと貼り付けは必要ありません。
 -- =============================================================================
 
 USE ROLE ACCOUNTADMIN;
@@ -110,16 +111,20 @@ GRANT SELECT ON FUTURE VIEWS  IN SCHEMA BCAST_VIEWING_HANDSON.MART TO ROLE BCAST
 -- =============================================================================
 -- 3. GitHub リポジトリに接続する
 -- =============================================================================
--- このリポジトリは公開されているので、認証情報は必要ありません。
--- API 統合だけを作れば、Snowflake からリポジトリの中身をステージとして
--- 参照できるようになります。
+-- ここで作る GIT REPOSITORY は、第 0 章で作ったワークスペースとは別の仕組みです。
 --
--- 非公開リポジトリを使う場合は、この章の末尾に手順を書いてあります。
+--   ワークスペース    画面でファイルを開いて編集・実行するための入れ物
+--   GIT REPOSITORY   SQL からリポジトリの中身をステージとして参照するための入れ物
+--
+-- このあと data フォルダの CSV を COPY で読み込むので、SQL から参照できる
+-- GIT REPOSITORY が必要になります。ワークスペースだけでは読み込めません。
+--
+-- API 統合は第 0 章で作ってあります。IF NOT EXISTS を付けているので、
+-- ここを実行してもワークスペースの接続には影響しません。
 
 USE SCHEMA BCAST_VIEWING_HANDSON.INTEGRATIONS;
 
--- どのドメインに出ていってよいかを宣言する。ここに書いていない先には接続できません。
-CREATE OR REPLACE API INTEGRATION BCAST_GIT_API
+CREATE API INTEGRATION IF NOT EXISTS BCAST_GIT_API
   API_PROVIDER = git_https_api
   API_ALLOWED_PREFIXES = ('https://github.com/sfc-gh-kenokizono')
   ENABLED = TRUE;
