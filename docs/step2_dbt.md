@@ -22,18 +22,34 @@ dbt Core をお使いになったことがあれば、書くもの（`dbt_projec
 
 ## 1. ワークスペースを作る
 
-1. Snowsight の左メニューで Projects、Workspaces を選びます
-2. 画面上部のワークスペース一覧から Create Workspace、From Git repository を選びます
+> **⚠️ 「dbt プロジェクト」ボタンは押さないでください**
+>
+> ワークスペースの初期画面に SQL ファイル、ノートブック、**dbt プロジェクト**、Streamlit アプリなどのボタンが並んでいます。ここの「dbt プロジェクト」は**空のプロジェクトを新規作成する**もので、教材のプロジェクトは入ってきません。
+>
+> この章でやるのは「教材のリポジトリを丸ごと取り込む」ことです。押す場所が違うので、次の手順に従ってください。
+
+1. Snowsight の左メニューで **Projects » Workspaces** を開きます
+2. **Workspaces メニュー**（左上のワークスペース名の横。初回は `+ Add New`）から **From Git repository** を選びます
 3. 次のように入力します
 
 | 項目 | 値 |
 |---|---|
 | Repository URL | `https://github.com/sfc-gh-kenokizono/broadcast-viewing-handson-ja.git` |
-| Workspace name | `bcast_viewing` |
-| API integration | `BCAST_GIT_API` |
-| 認証方式 | なし（公開リポジトリなので認証情報は不要です） |
+| ワークスペース名 | `bcast_viewing`（任意。既定のままでも構いません） |
+| API Integration | `BCAST_GIT_API`（第 1 章で作ったもの） |
+| 認証方法 | **Public repository** を選びます |
 
-4. Create を選びます
+4. **Create** を選びます
+
+認証方法の選択肢は 3 つ出てきます。このリポジトリは公開しているので **Public repository** です。
+
+| 選択肢 | 使う場面 |
+|---|---|
+| OAuth2 | GitHub と連携して認証する。書き込みもしたい場合 |
+| Personal access token | 非公開リポジトリを、トークンを保存したシークレットで参照する場合 |
+| **Public repository** | 公開リポジトリ。認証情報は不要 ← **今回はこれ** |
+
+`Public repository` を選んだ場合、ワークスペースからリポジトリへの**コミットとプッシュはできません**。教材を読んで実行するだけなので問題ありません。手元で書き換えて保存することはできます。
 
 リポジトリの中身が左側に表示されます。`dbt` フォルダの中が dbt プロジェクトです。
 
