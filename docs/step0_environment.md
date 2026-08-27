@@ -70,6 +70,18 @@ USE WAREHOUSE COMPUTE_WH;
 
 ## 3. Cortex が使えることを確認する
 
+### 先にクロスリージョンを有効にします
+
+モデルは提供されているリージョンが限られます。自分のアカウントのリージョンにないモデルを呼ぶと、Cortex は「使えません」と返すだけで、勝手に他のリージョンへは出ていきません。次の設定を入れると、足りないモデルを他のリージョンで処理します。
+
+```sql
+ALTER ACCOUNT SET CORTEX_ENABLED_CROSS_REGION = 'ANY_REGION';
+```
+
+このハンズオンはトライアルでの検証を前提にしているため、**あとで詰まらないよう最初から有効にします**。
+
+本番環境では、データが処理されるリージョンが変わることになります。データの置き場所に関する規程を確認したうえで判断してください。値には `'ANY_REGION'` のほかに、許可するリージョンを絞って `'AWS_US'` のように指定することもできます。既定値は `DISABLED` です。
+
 ```sql
 SELECT AI_COMPLETE(
   'claude-sonnet-4-5',
@@ -79,17 +91,17 @@ SELECT AI_COMPLETE(
 
 文章が返ってくれば、第 3 章以降で使う機能が利用できます。
 
+設定が入っているかは次で確認できます。
+
+```sql
+SHOW PARAMETERS LIKE 'CORTEX_ENABLED_CROSS_REGION' IN ACCOUNT;
+```
+
 ### 関数名について
 
 `AI_COMPLETE` を使います。以前は `SNOWFLAKE.CORTEX.COMPLETE` と書いていましたが、そちらは後方互換のために残されている旧名で、[公式ドキュメント](https://docs.snowflake.com/en/sql-reference/functions/complete-snowflake-cortex)に「2026 年内に廃止予定」と明記されています。新しく書くものは `AI_COMPLETE` を使ってください。名前空間の接頭辞は要りません。
 
 同じ整理が他の関数にも入っています。`SNOWFLAKE.CORTEX.SENTIMENT` は `AI_SENTIMENT`、`SNOWFLAKE.CORTEX.CLASSIFY_TEXT` は `AI_CLASSIFY` に置き換わっています。お客様の既存コードを見るときに気づけると印象が良いところです。
-
-エラーになる場合は、リージョンによってモデルが利用できないことがあります。その場合は次を実行して、他のリージョンで処理する設定を有効にしてから、もう一度試してください。
-
-```sql
-ALTER ACCOUNT SET CORTEX_ENABLED_CROSS_REGION = 'ANY_REGION';
-```
 
 ## 4. ワークスペースが使えることを確認する
 
