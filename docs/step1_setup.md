@@ -148,10 +148,10 @@ NW05        2026-07-17      9xx
 
 ```sql
 SELECT
-  QUERY_TYPE                                   AS 種別,
-  COUNT(*)                                     AS 実行回数,
-  ROUND(SUM(TOTAL_ELAPSED_TIME) / 1000, 1)     AS 合計秒数,
-  ROUND(SUM(CREDITS_USED_CLOUD_SERVICES), 6)   AS クラウドサービスのクレジット
+  QUERY_TYPE                                   AS "種別",
+  COUNT(*)                                     AS "実行回数",
+  ROUND(SUM(TOTAL_ELAPSED_TIME) / 1000, 1)     AS "合計秒数",
+  ROUND(SUM(CREDITS_USED_CLOUD_SERVICES), 6)   AS "クラウドサービスのクレジット"
 FROM SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY
 WHERE WAREHOUSE_NAME = 'BCAST_HANDSON_WH'
   AND START_TIME >= DATEADD('hour', -1, CURRENT_TIMESTAMP())

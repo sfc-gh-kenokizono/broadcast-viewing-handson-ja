@@ -15,50 +15,103 @@
 
 教材のリポジトリは公開してあるので、**GitHub のアカウントやトークンの準備は必要ありません**。
 
+## 使うファイル
+
+[sql/step0_check.sql](../sql/step0_check.sql)
+
+Snowsight でワークシートを新規作成し、このファイルの内容を貼り付けてから、上から順に実行していきます。書き換えは必要ありません。
+
+以降の章も同じ進め方です。各章に対応する SQL ファイルが `sql/` にあります。
+
 ## 1. どのアカウントで実施するかを決める
 
 Snowsight にサインインし、画面左下のアカウント名を確認します。複数のアカウントをお持ちの場合は、ここで 1 つに決めてしまってください。以降のすべての作業をそのアカウントで行います。
 
-## 2. 使えることを確認する
-
-Snowsight で新しい SQL ワークシートを開き、次を実行します。
+SQL でも確認できます。
 
 ```sql
 SELECT
-  CURRENT_ACCOUNT()  AS アカウント,
-  CURRENT_REGION()   AS リージョン,
-  CURRENT_USER()     AS ユーザー,
-  CURRENT_ROLE()     AS ロール,
-  CURRENT_VERSION()  AS バージョン;
+  CURRENT_ACCOUNT()  AS "アカウント",
+  CURRENT_REGION()   AS "リージョン",
+  CURRENT_USER()     AS "ユーザー",
+  CURRENT_ROLE()     AS "ロール",
+  CURRENT_VERSION()  AS "バージョン";
 ```
 
 ロールが `ACCOUNTADMIN` でない場合は、ワークシート右上のロール切り替えから変更してください。
 
+### 日本語の列名はダブルクォートで囲みます
+
+上のクエリで `"アカウント"` のように囲んでいるのは、そうしないと Snowflake が識別子として解釈できず、次のエラーになるためです。
+
+```
+syntax error line 2 at position 21 unexpected 'アカウント'.
+```
+
+英数字とアンダースコアだけの名前は囲まなくても通りますが、日本語・空白・記号を含む場合は囲む必要があります。この教材の SQL では、結果を読みやすくするために日本語の列名を多く使っているので、囲む書き方で統一してあります。
+
+## 2. 使うウェアハウスを選ぶ
+
+`SELECT` で計算をするには、ウェアハウス（計算資源）が選ばれている必要があります。選ばれていないと次のエラーになります。
+
+```
+No active warehouse selected in the current session.
+```
+
+このハンズオン用のウェアハウスは第 1 章で作ります。第 0 章の時点では、トライアルに最初から用意されているものを使います。
+
+```sql
+SHOW WAREHOUSES;
+
+USE WAREHOUSE COMPUTE_WH;
+```
+
+一覧に `COMPUTE_WH` がない場合は、出てきた名前に読み替えてください。
+
 ## 3. Cortex が使えることを確認する
 
 ```sql
-SELECT SNOWFLAKE.CORTEX.COMPLETE('claude-sonnet-4-5', '一言で自己紹介してください') AS 応答;
+SELECT SNOWFLAKE.CORTEX.COMPLETE(
+  'claude-sonnet-4-5',
+  '一言で自己紹介してください'
+) AS "応答";
 ```
 
 文章が返ってくれば、第 3 章以降で使う機能が利用できます。
 
-エラーになる場合は、リージョンによってモデルが利用できないことがあります。その場合は次を実行して、他のリージョンで処理する設定を有効にしてください。
+エラーになる場合は、リージョンによってモデルが利用できないことがあります。その場合は次を実行して、他のリージョンで処理する設定を有効にしてから、もう一度試してください。
 
 ```sql
 ALTER ACCOUNT SET CORTEX_ENABLED_CROSS_REGION = 'ANY_REGION';
 ```
 
-## 4. 個人データベースが有効か確認する
+## 4. ワークスペースが使えることを確認する
 
 第 2 章では Snowsight のワークスペースで dbt を動かします。ワークスペースは個人データベースの中に作られるため、アカウントでこの機能が有効になっている必要があります。
 
-Snowsight の左メニューで Projects の下に Workspaces が表示されていれば有効です。表示されていない場合は、ACCOUNTADMIN で有効化してください。
+```sql
+SHOW PARAMETERS LIKE 'ENABLE_PERSONAL_DATABASE' IN ACCOUNT;
+```
+
+`value` が `true` であれば有効です。`false` の場合は次を実行してください。
+
+```sql
+ALTER ACCOUNT SET ENABLE_PERSONAL_DATABASE = TRUE;
+```
+
+画面から確認する場合は、Snowsight の左メニューで Projects の下に Workspaces が表示されていれば有効です。
 
 ## 5. 使う容量の目安
 
 このハンズオンで扱うデータは圧縮後で 20 メガバイト程度、Snowflake 上に展開しても数百メガバイトです。ウェアハウスは XSMALL を使い、いちばん重い処理でも 1 分程度で終わります。トライアルの残り容量を大きく消費することはありません。
 
 各章の終わりに、その章で使った時間とクレジットを確認するクエリを載せています。実際の規模で見積もりを立てるときの手がかりになります。
+
+## 動作確認
+
+- ロールが `ACCOUNTADMIN` になっている
+- Cortex の呼び出しが文章を返す
+- `ENABLE_PERSONAL_DATABASE` が `true`
 
 ## 次へ
 

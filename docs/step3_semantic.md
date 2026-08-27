@@ -168,7 +168,7 @@ SELECT PARSE_JSON(
     'BCAST_VIEWING_HANDSON.MART.SVC_PROGRAM_CM_META',
     '{"query": "若い人向けのバラエティ番組", "columns": ["DOC_TYPE","TITLE","GENRE","TIME_SLOT"], "limit": 5}'
   )
-)['results'] AS 検索結果;
+)['results'] AS "検索結果";
 ```
 
 番組名に「バラエティ」という語が入っていなくても、概要文の内容から近いものが返ります。
