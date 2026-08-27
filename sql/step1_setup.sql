@@ -29,7 +29,16 @@ CREATE ROLE IF NOT EXISTS BCAST_ANALYST
   COMMENT = '集計済みの層だけを参照する';
 
 -- 自分自身に両方のロールを付与する（ロールを切り替えて挙動の違いを見るため）
+--
+-- SET でセッション変数に入れ、$ を付けて参照します。
+-- IDENTIFIER() は「文字列をオブジェクト名として扱う」という関数です。
+-- これがないと、変数の中身ではなく current_user_name という名前のユーザーを
+-- 探しにいってしまいます。
 SET current_user_name = (SELECT CURRENT_USER());
+
+-- 変数に何が入ったか確認しておきます
+SELECT $current_user_name AS "変数の中身";
+
 GRANT ROLE BCAST_ENGINEER TO USER IDENTIFIER($current_user_name);
 GRANT ROLE BCAST_ANALYST  TO USER IDENTIFIER($current_user_name);
 

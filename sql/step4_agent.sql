@@ -188,6 +188,7 @@ GRANT USAGE ON AGENT BCAST_VIEWING_HANDSON.MART.BCAST_VIEWING_AGENT TO ROLE BCAS
 -- 既定のロールと既定のウェアハウスはユーザーの属性なので、
 -- SHOW USERS の結果から自分の行を取り出して見ます。
 SET my_user = (SELECT CURRENT_USER());
+SELECT $my_user AS "変数の中身";
 SHOW USERS;
 SELECT
   "name"              AS "ユーザー",
