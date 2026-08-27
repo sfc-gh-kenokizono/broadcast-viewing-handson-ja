@@ -81,23 +81,32 @@ dbt/
 | 何の名前か | 値 | どこに出るか |
 |---|---|---|
 | ワークスペース名 | `bcast_viewing` | 画面左上。リポジトリを取り込んだ入れ物の名前 |
-| **dbt プロジェクト名** | **`dbt`** | **操作パネルの Project セレクタ** |
+| **dbt プロジェクト名** | **`bcast_dbt`** | **操作パネルの Project セレクタ** |
 | フォルダ名 | `dbt` | 左のファイル一覧 |
 | プロファイル名 | `bcast` | `profiles.yml` の中。画面には出ません |
 | ターゲット名 | `dev` | 操作パネルの Profile セレクタ |
 
-dbt プロジェクト名は `dbt_project.yml` の `name` で決まります。**フォルダ名と同じ `dbt` にそろえてあるので、左のツリーと Project セレクタが一致します。**
-
-`dbt_project.yml` の `models:` の下のキーも、この `name` と一致させる必要があります。ここがずれていると、層ごとのスキーマ指定が効きません。
+dbt プロジェクト名は `dbt_project.yml` の `name` で決まります。`dbt_project.yml` の `models:` の下のキーも、この `name` と一致させる必要があります。ここがずれていると、層ごとのスキーマ指定が効きません。
 
 ```yaml
-name: 'dbt'
+name: 'bcast_dbt'
 
 models:
-  dbt:          # name と同じにする
+  bcast_dbt:          # name と同じにする
     staging:
       +schema: STG
 ```
+
+> **`dbt` という名前は使えません**
+>
+> フォルダ名と合わせて `name: 'dbt'` にしたくなりますが、これは失敗します。
+>
+> ```
+> dbt found more than one package with the name "dbt" included in this project.
+> Package names must be unique in a project.
+> ```
+>
+> dbt 自身が `dbt` という名前のパッケージを持っているため、衝突します。`dbt_utils` のような一般的な名前も避けたほうが安全です。**プロジェクト名には、そのプロジェクトを指す固有の名前を付けます。**
 
 画面下部のバーに `dbt` と表示されていれば、Snowflake がプロジェクトを認識できています。
 
