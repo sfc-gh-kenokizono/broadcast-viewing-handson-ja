@@ -1,6 +1,6 @@
 # 放送視聴データ活用ハンズオン
 
-非特定視聴データを題材に、データの取り込みからデータ変換、セマンティックレイヤー、AI エージェント、可視化アプリまでを Snowflake の中だけで一本通すハンズオン教材です。所要時間は約 2 時間で、Snowsight のブラウザ画面だけで完結します。ローカルへのツールのインストールやコマンドライン操作は必要ありません。
+非特定視聴データを題材に、データの取り込みからデータ変換、セマンティックレイヤー、AI エージェント、可視化アプリまでを Snowflake の中だけで一本通すハンズオン教材です。所要時間は約 2 時間 30 分で、Snowsight のブラウザ画面だけで完結します。ローカルへのツールのインストールやコマンドライン操作は必要ありません。
 
 対象は**地上波 5 局の非特定視聴データだけ**です。配信（見逃し）のデータは含めていません。理由は[こちら](#地上波だけを対象にしている理由)に書いています。
 
@@ -15,6 +15,8 @@
 - 番組やコマーシャルの説明文を検索できるようにし、数値の集計と組み合わせて回答させる
 - マート層をそのまま可視化アプリにする
 - 生データと集計データでアクセス権を分け、識別子に伏せ字をかける
+- ウェアハウスのサイズ変更、結果キャッシュ、UNDROP、Time Travel、ゼロコピークローンを手で確かめる
+- コマーシャル素材の説明文を AI 関数で分類・抽出・要約し、リーチの数字と突き合わせる
 
 ## アーキテクチャ
 
@@ -67,8 +69,10 @@ GitHub リポジトリ (CSV)
 |---|---|---|---|---|
 | 0 | 環境の確認とワークスペースの用意 | 10 分 | [docs/step0_environment.md](docs/step0_environment.md) | [sql/step0_check.sql](sql/step0_check.sql) |
 | 1 | セットアップとデータの取り込み | 15 分 | [docs/step1_setup.md](docs/step1_setup.md) | [sql/step1_setup.sql](sql/step1_setup.sql) |
+| 1 補 | Snowflake そのものの動きを体感する | 12 分 | [docs/step1b_basics.md](docs/step1b_basics.md) | [sql/step1b_basics.sql](sql/step1b_basics.sql) |
 | 2 | dbt でデータを変換する | 40 分 | [docs/step2_dbt.md](docs/step2_dbt.md) | `dbt/` のモデル |
 | 3 | セマンティックビューと検索サービス | 20 分 | [docs/step3_semantic.md](docs/step3_semantic.md) | [sql/step3_semantic.sql](sql/step3_semantic.sql) |
+| 3 補 | AI 関数でテキストを数字の隣に並べる | 12 分 | [docs/step3b_ai.md](docs/step3b_ai.md) | [sql/step3b_ai_functions.sql](sql/step3b_ai_functions.sql) |
 | 4 | エージェントを作り自然言語で分析する | 20 分 | [docs/step4_cowork.md](docs/step4_cowork.md) | [sql/step4_agent.sql](sql/step4_agent.sql) |
 | 5 | 可視化アプリを作る | 10 分 | [docs/step5_app.md](docs/step5_app.md) | [sql/step5_app.sql](sql/step5_app.sql) |
 | 6 | アクセス権とマスキング | 15 分 | [docs/step6_rbac.md](docs/step6_rbac.md) | [sql/step6_rbac.sql](sql/step6_rbac.sql) |
@@ -87,8 +91,10 @@ GitHub リポジトリ (CSV)
          ワークスペースを作る（画面操作）
            ↓  リポジトリの中身が全部そろう
 第 1 章  ワークスペースで sql/step1_setup.sql を開いて実行
+第 1 章補 ワークスペースで sql/step1b_basics.sql を開いて実行
 第 2 章  ワークスペースで dbt/ を動かす
 第 3 章  ワークスペースで sql/step3_semantic.sql を開いて実行
+第 3 章補 ワークスペースで sql/step3b_ai_functions.sql を開いて実行
 第 4 章  ワークスペースで sql/step4_agent.sql を開いて実行
 第 5 章  ワークスペースで sql/step5_app.sql を開いて実行
 第 6 章  ワークスペースで sql/step6_rbac.sql を開いて実行
@@ -104,7 +110,7 @@ GitHub リポジトリ (CSV)
 |---|---|
 | データベース | `BCAST_VIEWING_HANDSON` |
 | スキーマ | `RAW` / `STG` / `INT` / `MART` / `INTEGRATIONS` |
-| ウェアハウス | `BCAST_HANDSON_WH`（XSMALL） |
+| ウェアハウス | `BCAST_HANDSON_WH`（XSMALL。第 1 章補で一時的に LARGE にして戻します） |
 | ロール | `BCAST_ENGINEER`（生データから集計まで） / `BCAST_ANALYST`（集計データのみ） |
 
 ## サンプルデータの規模
