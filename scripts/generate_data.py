@@ -14,6 +14,7 @@ Git リポジトリステージ経由で COPY INTO する。
     放送と配信を紐付けるには名寄せが必要で、そこが最大の論点になるため、
     名寄せ済みを前提にしたデータは作らない。
   - 1 行 = 1 視聴区間（from-to）。放送の非特定視聴データの粒度に合わせる。
+  - 1 台の受信機は同時に 1 局だけを見る。ログのない時間は視聴していない時間。
   - ID は 3 階層（各局 ID / 共通 ID / IP アドレス）。各局 ID は局をまたいで一致しない。
   - 属性は 10 パーセントの端末にしか存在しない。世帯人数も個人属性も視聴ログには入れない。
   - 視聴は番組の放送枠に紐づけて発生させる。そうしないと番組別の集計が意味を持たない。
@@ -27,6 +28,7 @@ Git リポジトリステージ経由で COPY INTO する。
 from __future__ import annotations
 
 import argparse
+import bisect
 import csv
 import gzip
 import hashlib
@@ -463,11 +465,12 @@ def genre_affinity(dev, genre: str) -> float:
 
 
 def build_viewing_logs(rng: random.Random, devices, schedule, total_rows: int):
-    """局ごとの視聴区間を作る。
+    """1 台の受信機が同時に 1 局だけを見る視聴区間を作る。
 
     放送枠に紐づけて発生させる。そうしないと番組別の集計が意味を持たない。
     区間の長さは短いものが多く長いものが少ない分布にし、平均を 12 分前後にする。
-    局ごとの行数は NETWORK_SHARE で配分し、規模の差を作る。
+    局ごとの行数は NETWORK_SHARE で配分し、規模の差を作る。同じ COMMON_ID の
+    区間は全局を通じて管理し、TV を見ていない時間は行のない空白として残す。
     """
     by_network = {nw[0]: [] for nw in NETWORKS}
     sched_by_network = {nw[0]: [] for nw in NETWORKS}
@@ -478,6 +481,17 @@ def build_viewing_logs(rng: random.Random, devices, schedule, total_rows: int):
     device_weights = [d["activity"] for d in devices]
     duration_values = [2, 5, 8, 12, 20, 30, 45, 60]
     duration_weights = [18, 20, 14, 14, 12, 10, 7, 5]
+    intervals_by_device_day = {}
+
+    def reserve_interval(common_id, start, end):
+        intervals = intervals_by_device_day.setdefault((common_id, start.date()), [])
+        position = bisect.bisect_left(intervals, (start, end))
+        if position > 0 and intervals[position - 1][1] > start:
+            return False
+        if position < len(intervals) and intervals[position][0] < end:
+            return False
+        intervals.insert(position, (start, end))
+        return True
 
     for network_id, slots in sched_by_network.items():
         per_network = int(total_rows * NETWORK_SHARE[network_id])
@@ -503,6 +517,9 @@ def build_viewing_logs(rng: random.Random, devices, schedule, total_rows: int):
                 offset = rng.randint(0, max(0, span_min - 2))
                 duration = min(duration, span_min - offset) or 1
                 start = slot["air_from"] + timedelta(minutes=offset, seconds=rng.randint(0, 59))
+                end = min(start + timedelta(minutes=duration), slot["air_to"])
+                if not reserve_interval(dev["common_id"], start, end):
+                    continue
                 rows.append([
                     network_id,
                     station_device_id(network_id, dev["common_id"]),
@@ -511,7 +528,7 @@ def build_viewing_logs(rng: random.Random, devices, schedule, total_rows: int):
                     dev["postal_code"],
                     channel_of[network_id],
                     start.strftime("%Y-%m-%d %H:%M:%S"),
-                    (start + timedelta(minutes=duration)).strftime("%Y-%m-%d %H:%M:%S"),
+                    end.strftime("%Y-%m-%d %H:%M:%S"),
                 ])
                 if len(rows) >= per_network:
                     break

@@ -85,11 +85,33 @@ def main():
 
     viewing_rows = 0
     view_starts_by_hour = Counter()
+    clean_intervals_by_device = defaultdict(list)
+    seen_rows = set()
     for network_id in sorted(NETWORK_IDS):
         rows = read_csv(f"viewing_log_{network_id.lower()}")
         viewing_rows += len(rows)
         for row in rows:
-            view_starts_by_hour[datetime.fromisoformat(row["VIEW_FROM"]).hour] += 1
+            start = datetime.fromisoformat(row["VIEW_FROM"])
+            end = datetime.fromisoformat(row["VIEW_TO"])
+            view_starts_by_hour[start.hour] += 1
+            row_key = tuple(row.values())
+            if row_key in seen_rows:
+                continue
+            seen_rows.add(row_key)
+            if end <= start or end - start > timedelta(hours=24):
+                continue
+            clean_intervals_by_device[row["COMMON_ID"]].append(
+                (start, end, row["NETWORK_ID"])
+            )
+
+    for common_id, intervals in clean_intervals_by_device.items():
+        intervals.sort()
+        for previous, current in zip(intervals, intervals[1:]):
+            if previous[1] > current[0]:
+                fail(
+                    "同じTVの正常な視聴区間が重なっています: "
+                    f"{common_id} {previous} {current}"
+                )
 
     print("DATA AUDIT: PASS")
     print(f"番組マスタ: {len(programs):,}（概要文 {len(programs):,} 種類）")
@@ -97,6 +119,7 @@ def main():
     print(f"CM素材: {len(creatives):,}（分析対象 20）")
     print(f"CM放送実績: {len(spots):,}（1局1日 {len(spots) / days / len(NETWORK_IDS):.1f} 本）")
     print(f"視聴区間: {viewing_rows:,}")
+    print("正常化後の同一TV内の時間重複: 0")
     print("CM開始時刻（時間別）:", dict(sorted(starts_by_hour.items())))
     print("視聴開始時刻（時間別）:", dict(sorted(view_starts_by_hour.items())))
 

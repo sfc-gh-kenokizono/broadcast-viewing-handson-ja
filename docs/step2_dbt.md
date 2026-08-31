@@ -276,7 +276,7 @@ RAW 11 テーブル
 
 これは意図的です。毎分の視聴推移のような指標を出すための素材として置いてあります。第 9 節で直接クエリして行数を確認します。
 
-ただし実務では、この「行き止まり」は**確認すべき合図**です。12,117,641 行のテーブルを毎回作っていて、誰も使っていないなら、それは払う必要のないコストです。**DAG は使われていないモデルを見つける道具にもなります。** お客様の環境で最初に見る観点として使えます。
+ただし実務では、この「行き止まり」は**確認すべき合図**です。12,078,021 行のテーブルを毎回作っていて、誰も使っていないなら、それは払う必要のないコストです。**DAG は使われていないモデルを見つける道具にもなります。** お客様の環境で最初に見る観点として使えます。
 
 **④ ノードをクリックして SQL を開く**
 
@@ -360,7 +360,7 @@ SHOW TABLES IN SCHEMA BCAST_VIEWING_HANDSON.MART;
 | `INT` | ビュー 3 + テーブル 1（`int_viewing_minutes`） | 4 |
 | `MART` | テーブル | 4 |
 
-`STG` と `INT` は基本的にビューです。参照されたときに計算します。`MART` は可視化アプリやエージェントが繰り返し参照するので、計算結果を持たせています。`int_viewing_minutes` だけ `INT` でもテーブルにしているのは、1,212 万行の分解を毎回やり直すのが無駄だからです。
+`STG` と `INT` は基本的にビューです。参照されたときに計算します。`MART` は可視化アプリやエージェントが繰り返し参照するので、計算結果を持たせています。`int_viewing_minutes` だけ `INT` でもテーブルにしているのは、約 1,208 万行の分解を毎回やり直すのが無駄だからです。
 
 ### マート層の粒度について
 
@@ -393,15 +393,40 @@ SHOW TABLES IN SCHEMA BCAST_VIEWING_HANDSON.MART;
 | `unique` | 重複がない | 1 台のはずが複数行ある。台数を数えると多く出る |
 | `accepted_values` | 決めた値以外が入っていない | 想定外の局コードが混ざっている。取り込みか変換の誤り |
 
-全部で **16 件**です。出力タブに次のように出ます。
+全部で **17 件**です。16件の宣言テストに加え、「同じTVの視聴区間が重ならない」ことを確かめるSQLテストが1件あります。出力タブに次のように出ます。
 
 ```
-Finished running 16 data tests
+Finished running 17 data tests
 Completed successfully
-Done. PASS=16 WARN=0 ERROR=0 SKIP=0
+Done. PASS=17 WARN=0 ERROR=0 SKIP=0
 ```
 
-**`PASS=16 ERROR=0`** が正解です。
+**`PASS=17 ERROR=0`** が正解です。
+
+### 同じTVの時間が重なっていないことも確認する
+
+1台のTVは同時に1チャンネルしか映せません。正常なデータでは、同じ `COMMON_ID` の前の視聴終了より、次の視聴開始が早くなることはありません。
+
+```sql
+WITH sequenced AS (
+  SELECT
+    COMMON_ID,
+    NETWORK_ID,
+    VIEW_FROM,
+    VIEW_TO,
+    MAX(VIEW_TO) OVER (
+      PARTITION BY COMMON_ID
+      ORDER BY VIEW_FROM, VIEW_TO
+      ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+    ) AS PREVIOUS_MAX_VIEW_TO
+  FROM BCAST_VIEWING_HANDSON.STG.STG_VIEWING_LOG
+)
+SELECT COUNT(*) AS "同じTVで時間が重なる行"
+FROM sequenced
+WHERE VIEW_FROM < PREVIOUS_MAX_VIEW_TO;
+```
+
+結果は **0件**です。区間の間に空白があれば、その時間はTVを見ていません。間を空けず別の局が始まれば、チャンネルを移動したと解釈できます。
 
 ### テストが終わったら XSMALL に戻す 💰
 
@@ -511,8 +536,8 @@ SELECT
 
 ```
 分解前の行数    1,050,000
-分解後の行数   12,117,641
-平均の視聴区間長   11.3 分
+分解後の行数   12,078,021
+平均の視聴区間長   11.4 分
 ```
 
 分解後の行数は、分解前の行数に平均の視聴区間長を掛けた値とほぼ一致します。**平均が M 分なら行数はおよそ M 倍**という関係です。

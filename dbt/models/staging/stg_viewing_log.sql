@@ -56,4 +56,4 @@ select
     datediff('second', VIEW_FROM, VIEW_TO) / 60.0    as VIEW_MINUTES
 from deduplicated
 where VIEW_TO > VIEW_FROM
-  and datediff('hour', VIEW_FROM, VIEW_TO) <= 24
+  and datediff('second', VIEW_FROM, VIEW_TO) <= 86400
