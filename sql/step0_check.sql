@@ -117,9 +117,9 @@ SHOW INTEGRATIONS LIKE 'BCAST_GIT_API';
 --   3. 次のように入力する
 --
 --        Repository URL   https://github.com/sfc-gh-kenokizono/broadcast-viewing-handson-ja.git
---        ワークスペース名   bcast_viewing
+--        ワークスペース名   broadcast-viewing-handson-ja（自動で入ります）
 --        API Integration   BCAST_GIT_API
---        認証方法          Public repository
+--        認証方法          パブリックリポジトリ（Public repository）
 --
 --   4. Create を選ぶ
 --

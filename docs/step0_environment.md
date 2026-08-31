@@ -144,9 +144,9 @@ SHOW INTEGRATIONS LIKE 'BCAST_GIT_API';
 | 項目 | 値 |
 |---|---|
 | Repository URL | `https://github.com/sfc-gh-kenokizono/broadcast-viewing-handson-ja.git` |
-| ワークスペース名 | `bcast_viewing` |
+| ワークスペース名 | `broadcast-viewing-handson-ja`（**自動で入ります**。触らなくてよい） |
 | API Integration | `BCAST_GIT_API` |
-| 認証方法 | **Public repository** |
+| 認証方法 | **パブリックリポジトリ**（Public repository） |
 
 4. **Create** を選びます
 
@@ -158,13 +158,14 @@ SHOW INTEGRATIONS LIKE 'BCAST_GIT_API';
 
 ### 認証方法の選択肢
 
+ダイアログの下側に 2 つ並びます。
+
 | 選択肢 | 使う場面 |
 |---|---|
-| OAuth2 | GitHub と連携して認証する。書き込みもしたい場合 |
-| Personal access token | 非公開リポジトリを、トークンを保存したシークレットで参照する場合 |
-| **Public repository** | 公開リポジトリ。認証情報は不要 ← **今回はこれ** |
+| 個人用アクセストークン（Personal access token） | 非公開リポジトリを、トークンを保存したシークレットで参照する場合 |
+| **パブリックリポジトリ**（Public repository） | 公開リポジトリ。認証情報は不要 ← **今回はこれ** |
 
-`Public repository` を選んだ場合、ワークスペースからリポジトリへの**コミットとプッシュはできません**。教材を読んで実行するだけなので問題ありません。手元で書き換えて保存することはできます。
+`パブリックリポジトリ` を選んだ場合、ワークスペースからリポジトリへの**コミットとプッシュはできません**。教材を読んで実行するだけなので問題ありません。手元で書き換えて保存することはできます。
 
 ### ワークスペースは何の上に作られるのか
 
