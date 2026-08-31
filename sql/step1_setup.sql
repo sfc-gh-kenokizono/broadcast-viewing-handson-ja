@@ -6,7 +6,7 @@
 --
 -- このスクリプトでやること
 --   1. ロールを 2 つ作る（生データまで見られる人と、集計データだけ見られる人）
---   2. データベース、ウェアハウス、4 つのスキーマを作る
+--   2. データベース、ウェアハウス、5 つのスキーマを作る
 --   3. GitHub リポジトリに接続する
 --   4. リポジトリの CSV を RAW スキーマに読み込む
 --
@@ -68,15 +68,15 @@ CREATE WAREHOUSE IF NOT EXISTS BCAST_HANDSON_WH
 CREATE DATABASE IF NOT EXISTS BCAST_VIEWING_HANDSON;
 
 CREATE SCHEMA IF NOT EXISTS BCAST_VIEWING_HANDSON.RAW
-  COMMENT = '受け取ったままの原本。加工しない';
+  COMMENT = '放送局から受け取った原本を、加工せず保管するためのスキーマ';
 CREATE SCHEMA IF NOT EXISTS BCAST_VIEWING_HANDSON.STG
-  COMMENT = 'クレンジング済み';
+  COMMENT = '異常値や重複を除き、分析に使える形へ整えるためのスキーマ';
 CREATE SCHEMA IF NOT EXISTS BCAST_VIEWING_HANDSON.INT
-  COMMENT = '中間処理。ID の名寄せ、番組枠との結合、1 分単位への分解';
+  COMMENT = 'ID の名寄せ、番組枠との結合、1 分単位への分解を行うためのスキーマ';
 CREATE SCHEMA IF NOT EXISTS BCAST_VIEWING_HANDSON.MART
-  COMMENT = '提供用。指標の算出';
+  COMMENT = 'リーチなどの指標を、AI やアプリへ提供するためのスキーマ';
 CREATE SCHEMA IF NOT EXISTS BCAST_VIEWING_HANDSON.INTEGRATIONS
-  COMMENT = 'GitHub 接続に必要なオブジェクト';
+  COMMENT = 'Git リポジトリと、取り込み用ファイルの置き場をまとめるためのスキーマ';
 
 -- dbt の実行ログを残せるようにする（第 2 章の任意項目で使います）
 ALTER SCHEMA BCAST_VIEWING_HANDSON.STG  SET LOG_LEVEL = 'INFO';

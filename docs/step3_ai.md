@@ -2,7 +2,7 @@
 
 所要時間の目安: 12 分
 実行するロール: ACCOUNTADMIN
-使うファイル: `sql/step3b_ai_functions.sql`（ワークスペースの左側の一覧から開きます）
+使うファイル: `sql/step3_ai_functions.sql`（ワークスペースの左側の一覧から開きます）
 
 ---
 
@@ -57,7 +57,7 @@ AI 関数の費用は、処理した文字数（トークン数）で決まり�
 
 ## 3. 何を実行するのか
 
-`sql/step3b_ai_functions.sql` を上から順に実行します。
+`sql/step3_ai_functions.sql` を上から順に実行します。
 
 ### 3-0　素材になる文章を見る
 

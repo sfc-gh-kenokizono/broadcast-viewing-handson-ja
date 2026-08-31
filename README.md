@@ -69,10 +69,10 @@ GitHub リポジトリ (CSV)
 |---|---|---|---|---|
 | 0 | 環境の確認とワークスペースの用意 | 10 分 | [docs/step0_environment.md](docs/step0_environment.md) | [sql/step0_check.sql](sql/step0_check.sql) |
 | 1 | セットアップとデータの取り込み | 15 分 | [docs/step1_setup.md](docs/step1_setup.md) | [sql/step1_setup.sql](sql/step1_setup.sql) |
-| 1 補 | Snowflake そのものの動きを体感する | 12 分 | [docs/step1b_basics.md](docs/step1b_basics.md) | [sql/step1b_basics.sql](sql/step1b_basics.sql) |
+| 基本機能 | Snowflake そのものの動きを体感する | 12 分 | [docs/step1_basics.md](docs/step1_basics.md) | [sql/step1_basics.sql](sql/step1_basics.sql) |
 | 2 | dbt でデータを変換する | 40 分 | [docs/step2_dbt.md](docs/step2_dbt.md) | `dbt/` のモデル |
 | 3 | セマンティックビューと検索サービス | 20 分 | [docs/step3_semantic.md](docs/step3_semantic.md) | [sql/step3_semantic.sql](sql/step3_semantic.sql) |
-| 3 補 | AI 関数でテキストを数字の隣に並べる | 12 分 | [docs/step3b_ai.md](docs/step3b_ai.md) | [sql/step3b_ai_functions.sql](sql/step3b_ai_functions.sql) |
+| AI 関数 | AI 関数でテキストを数字の隣に並べる | 12 分 | [docs/step3_ai.md](docs/step3_ai.md) | [sql/step3_ai_functions.sql](sql/step3_ai_functions.sql) |
 | 4 | エージェントを作り自然言語で分析する | 20 分 | [docs/step4_cowork.md](docs/step4_cowork.md) | [sql/step4_agent.sql](sql/step4_agent.sql) |
 | 5 | 可視化アプリを作る | 10 分 | [docs/step5_app.md](docs/step5_app.md) | [sql/step5_app.sql](sql/step5_app.sql) |
 | 6 | アクセス権とマスキング | 15 分 | [docs/step6_rbac.md](docs/step6_rbac.md) | [sql/step6_rbac.sql](sql/step6_rbac.sql) |
@@ -91,16 +91,18 @@ GitHub リポジトリ (CSV)
          ワークスペースを作る（画面操作）
            ↓  リポジトリの中身が全部そろう
 第 1 章  ワークスペースで sql/step1_setup.sql を開いて実行
-第 1 章補 ワークスペースで sql/step1b_basics.sql を開いて実行
+基本機能   ワークスペースで sql/step1_basics.sql を開いて実行
 第 2 章  LARGEへ拡大 → dbt/ を動かす → XSMALLへ戻す
 第 3 章  ワークスペースで sql/step3_semantic.sql を開いて実行
-第 3 章補 ワークスペースで sql/step3b_ai_functions.sql を開いて実行
+AI 関数   ワークスペースで sql/step3_ai_functions.sql を開いて実行
 第 4 章  ワークスペースで sql/step4_agent.sql を開いて実行
 第 5 章  ワークスペースで sql/step5_app.sql を開いて実行
 第 6 章  ワークスペースで sql/step6_rbac.sql を開いて実行
 ```
 
 第 0 章でワークスペースを作るのは、そこから先で使うファイルをすべて手元に置くためです。Git リポジトリを参照する `API INTEGRATION` はアカウントに属するオブジェクトなので、データベースを作る前に用意できます。
+
+`API INTEGRATION` はGitHubへの接続を許可するアカウント全体の「通行許可証」です。Step 1で作る `INTEGRATIONS` スキーマは、Gitリポジトリと取り込み用ファイルの置き場をまとめる、データベース内の「箱」です。名前は似ていますが、別のオブジェクトです。
 
 データの構造とカラムの意味は [docs/data_dictionary.md](docs/data_dictionary.md) にまとめています。
 
