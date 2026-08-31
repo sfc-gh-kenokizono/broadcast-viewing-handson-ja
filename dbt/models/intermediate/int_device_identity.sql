@@ -11,7 +11,7 @@ with device as (
 
     select
         COMMON_ID,
-        IP_ADDRESS,
+        max(IP_ADDRESS)                   as IP_ADDRESS,
         max(POSTAL_CODE)                 as POSTAL_CODE,
         min(VIEW_DATE)                   as FIRST_SEEN_DATE,
         max(VIEW_DATE)                   as LAST_SEEN_DATE,
@@ -24,7 +24,7 @@ with device as (
         count(distinct STATION_DEVICE_ID) as STATION_DEVICE_ID_COUNT,
         listagg(distinct NETWORK_ID, ',') within group (order by NETWORK_ID) as NETWORKS_SEEN
     from {{ ref('stg_viewing_log') }}
-    group by COMMON_ID, IP_ADDRESS
+    group by COMMON_ID
 
 ),
 

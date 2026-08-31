@@ -45,6 +45,7 @@ transitions as (
     from sequenced
     where PREV_CHANNEL_CODE is not null
       and PREV_CHANNEL_CODE <> CHANNEL_CODE
+      and datediff('minute', PREV_VIEW_TO, VIEW_FROM) >= 0
       and datediff('minute', PREV_VIEW_TO, VIEW_FROM) <= 30
 
 )

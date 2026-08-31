@@ -35,7 +35,7 @@ USE SCHEMA BCAST_VIEWING_HANDSON.RAW;
 --
 -- 何を実行するか
 --   視聴区間を 1 分単位に分解しながら、毎分・局ごとの視聴受信機数を数えます。
---   105 万行の視聴区間が 1,187 万行に膨らみ、そこから重複しない受信機を
+--   105 万行の視聴区間が 1,212 万行に膨らみ、そこから重複しない受信機を
 --   数えるので、それなりに計算量のあるクエリです。
 --   （この分解は第 2 章で dbt が作るものと同じ考え方です。先取りになります）
 --
@@ -46,6 +46,10 @@ USE SCHEMA BCAST_VIEWING_HANDSON.RAW;
 
 -- 1-1 まず XSMALL のまま実行します
 ALTER WAREHOUSE BCAST_HANDSON_WH SET WAREHOUSE_SIZE = 'XSMALL';
+
+-- サイズ差だけを比べるため、この節では結果キャッシュを一時的に使いません。
+-- これがないと、LARGE のクエリが前回結果を返し、正しい比較になりません。
+ALTER SESSION SET USE_CACHED_RESULT = FALSE;
 
 WITH logs AS (
   SELECT NETWORK_ID, COMMON_ID, VIEW_FROM, VIEW_TO FROM VIEWING_LOG_NW01
@@ -122,6 +126,9 @@ LIMIT 20;
 -- =============================================================================
 -- 3 度目です。文字が 1 文字も違わない同じクエリを、もう一度実行します。
 
+-- ここから結果キャッシュを使う設定に戻します。
+ALTER SESSION SET USE_CACHED_RESULT = TRUE;
+
 WITH logs AS (
   SELECT NETWORK_ID, COMMON_ID, VIEW_FROM, VIEW_TO FROM VIEWING_LOG_NW01
   UNION ALL SELECT NETWORK_ID, COMMON_ID, VIEW_FROM, VIEW_TO FROM VIEWING_LOG_NW02
@@ -181,10 +188,10 @@ SELECT COUNT(*) AS "削除前の行数" FROM VIEWING_LOG_NW01;
 -- 3-2 消します
 DROP TABLE VIEWING_LOG_NW01;
 
--- 3-3 本当に無くなったことを確認します。この文はエラーになります。
---     「Table 'VIEWING_LOG_NW01' does not exist or not authorized.」と出ます。
---     エラーが出るのが正しい動きです。
-DESCRIBE TABLE VIEWING_LOG_NW01;
+-- 3-3 本当に無くなったことを確認します。結果が 0 行なら消えています。
+--     DESCRIBE TABLE を使うと意図どおりエラーになりますが、ファイル全体を
+--     実行した場合はそこで停止するため、エラーを出さない SHOW を使います。
+SHOW TABLES LIKE 'VIEWING_LOG_NW01' IN SCHEMA BCAST_VIEWING_HANDSON.RAW;
 
 -- 3-4 元に戻します
 UNDROP TABLE VIEWING_LOG_NW01;
@@ -247,8 +254,8 @@ UPDATE VIEWING_LOG_NW01_DEV SET CHANNEL_CODE = '999';
 
 -- 5-4 本番が変わっていないことを確認します
 SELECT
-  (SELECT COUNT(DISTINCT CHANNEL_CODE) FROM VIEWING_LOG_NW01)     AS "本番のチャンネル種類数",
-  (SELECT COUNT(DISTINCT CHANNEL_CODE) FROM VIEWING_LOG_NW01_DEV) AS "複製のチャンネル種類数";
+  (SELECT MIN(CHANNEL_CODE) FROM VIEWING_LOG_NW01)     AS "本番のチャンネル値",
+  (SELECT MIN(CHANNEL_CODE) FROM VIEWING_LOG_NW01_DEV) AS "複製のチャンネル値";
 
 -- 押さえておきたいこと
 --   5-1 は一瞬で終わります。行をコピーしていないためです。作られたのは

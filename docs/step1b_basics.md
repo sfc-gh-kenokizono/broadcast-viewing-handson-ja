@@ -39,7 +39,7 @@ dbt でモデルを書き、セマンティックビューを作り、エージ�
 
 実行するクエリは、視聴区間を 1 分単位に分解しながら、
 毎分・局ごとの視聴受信機数を数えるものです。
-105 万行の視聴区間が 1,187 万行に膨らみ、そこから重複しない受信機を数えるので、
+105 万行の視聴区間が 1,212 万行に膨らみ、そこから重複しない受信機を数えるので、
 それなりに計算量があります。
 
 この分解は、第 2 章で dbt が作る `int_viewing_minutes` と同じ考え方です。
@@ -48,9 +48,12 @@ dbt でモデルを書き、セマンティックビューを作り、エージ�
 **手順**
 
 1. `ALTER WAREHOUSE ... SET WAREHOUSE_SIZE = 'XSMALL';` を実行
-2. 集計クエリを実行し、**実行時間を書き留める**（Snowsight の結果パネルに Duration として出ます）
-3. `ALTER WAREHOUSE ... SET WAREHOUSE_SIZE = 'LARGE';` を実行
-4. **まったく同じクエリ**を実行し、時間を比べる
+2. `ALTER SESSION SET USE_CACHED_RESULT = FALSE;` で比較中の結果キャッシュを止める
+3. 集計クエリを実行し、**実行時間を書き留める**（Snowsight の結果パネルに Duration として出ます）
+4. `ALTER WAREHOUSE ... SET WAREHOUSE_SIZE = 'LARGE';` を実行
+5. **まったく同じクエリ**を実行し、時間を比べる
+
+比較中だけ結果キャッシュを止めないと、LARGE 側が XSMALL の前回結果を返し、サイズ差を正しく測れません。
 
 **確認してほしいこと**
 
@@ -68,7 +71,8 @@ XSMALL から LARGE は 4 段階です。1 段上がるごとに計算資源が 
 
 ### 2-2　結果キャッシュ
 
-3 度目に、**1 文字も違わない同じクエリ**を実行します。ほぼ 0 秒で返ります。
+`ALTER SESSION SET USE_CACHED_RESULT = TRUE;` で結果キャッシュを戻してから、
+3 度目に**1 文字も違わない同じクエリ**を実行します。ほぼ 0 秒で返ります。
 
 同じクエリで、参照しているテーブルが 1 行も変わっていない場合、
 Snowflake は前回の結果をそのまま返します。ウェアハウスは 1 秒も動きません。
@@ -90,14 +94,14 @@ Snowflake は前回の結果をそのまま返します。ウェアハウスは 
 ```sql
 SELECT COUNT(*) FROM VIEWING_LOG_NW01;   -- 行数を覚えておく
 DROP TABLE VIEWING_LOG_NW01;             -- 消す
-DESCRIBE TABLE VIEWING_LOG_NW01;         -- ★エラーになるのが正しい
+SHOW TABLES LIKE 'VIEWING_LOG_NW01';     -- 0 行なら消えている
 UNDROP TABLE VIEWING_LOG_NW01;           -- 戻す
 SELECT COUNT(*) FROM VIEWING_LOG_NW01;   -- 行数が一致することを確認
 ```
 
-3 行目は **わざとエラーを出しています**。
-`Table 'VIEWING_LOG_NW01' does not exist or not authorized.` と出れば正常です。
-本当に消えていることを確認してから戻す、という順番です。
+3 行目はエラーを出さず、存在するテーブルだけを探します。結果が 0 行なら正常です。
+`DESCRIBE TABLE` でも消えたことは確認できますが、エラーでファイル全体の実行が
+止まるため、この教材では `SHOW TABLES` を使います。
 
 **なぜ戻るのか**
 

@@ -15,14 +15,23 @@ select
     vp.NETWORK_ID,
     n.NETWORK_NAME,
     vp.AIR_DATE,
+    vp.PROGRAM_AIR_FROM,
+    vp.PROGRAM_AIR_TO,
     vp.COMMON_ID,
     vp.IP_ADDRESS,
     d.POSTAL_AREA,
     d.DEVICES_PER_IP,
     d.GENDER_AGE_SEGMENT,
     d.IS_PANEL,
-    round(sum(vp.OVERLAP_MINUTES), 2) as VIEW_MINUTES,
-    round(max(vp.COMPLETION_RATE), 3) as COMPLETION_RATE
+    round(least(
+        sum(vp.OVERLAP_MINUTES),
+        datediff('second', vp.PROGRAM_AIR_FROM, vp.PROGRAM_AIR_TO) / 60.0
+    ), 2) as VIEW_MINUTES,
+    round(least(
+        sum(vp.OVERLAP_MINUTES)
+            / nullif(datediff('second', vp.PROGRAM_AIR_FROM, vp.PROGRAM_AIR_TO) / 60.0, 0),
+        1
+    ), 3) as COMPLETION_RATE
 from {{ ref('int_viewing_program') }} vp
 inner join {{ source('raw', 'PROGRAM_MASTER') }} p
     on vp.PROGRAM_ID = p.PROGRAM_ID
@@ -38,6 +47,8 @@ group by
     vp.NETWORK_ID,
     n.NETWORK_NAME,
     vp.AIR_DATE,
+    vp.PROGRAM_AIR_FROM,
+    vp.PROGRAM_AIR_TO,
     vp.COMMON_ID,
     vp.IP_ADDRESS,
     d.POSTAL_AREA,

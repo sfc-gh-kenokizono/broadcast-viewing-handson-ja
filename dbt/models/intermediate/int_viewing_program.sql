@@ -16,6 +16,8 @@ select
     v.VIEW_DATE,
     s.PROGRAM_ID,
     s.AIR_DATE,
+    s.AIR_FROM                                                        as PROGRAM_AIR_FROM,
+    s.AIR_TO                                                          as PROGRAM_AIR_TO,
     greatest(v.VIEW_FROM, s.AIR_FROM)                                          as OVERLAP_FROM,
     least(v.VIEW_TO, s.AIR_TO)                                                 as OVERLAP_TO,
     datediff('second', greatest(v.VIEW_FROM, s.AIR_FROM),

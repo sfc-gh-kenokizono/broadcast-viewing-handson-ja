@@ -3,7 +3,7 @@
 -- コマーシャルが流れた瞬間に、その局を見ていた区間が重なっていれば接触とみなします。
 -- 放送実績の時刻が視聴区間の中に入っているかどうかだけを見ています。
 
-select
+select distinct
     sp.SPOT_ID,
     sp.CM_ID,
     sp.NETWORK_ID,
