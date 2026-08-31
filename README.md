@@ -92,7 +92,7 @@ GitHub リポジトリ (CSV)
            ↓  リポジトリの中身が全部そろう
 第 1 章  ワークスペースで sql/step1_setup.sql を開いて実行
 第 1 章補 ワークスペースで sql/step1b_basics.sql を開いて実行
-第 2 章  ワークスペースで dbt/ を動かす
+第 2 章  LARGEへ拡大 → dbt/ を動かす → XSMALLへ戻す
 第 3 章  ワークスペースで sql/step3_semantic.sql を開いて実行
 第 3 章補 ワークスペースで sql/step3b_ai_functions.sql を開いて実行
 第 4 章  ワークスペースで sql/step4_agent.sql を開いて実行
@@ -110,7 +110,7 @@ GitHub リポジトリ (CSV)
 |---|---|
 | データベース | `BCAST_VIEWING_HANDSON` |
 | スキーマ | `RAW` / `STG` / `INT` / `MART` / `INTEGRATIONS` |
-| ウェアハウス | `BCAST_HANDSON_WH`（XSMALL。第 1 章補で一時的に LARGE にして戻します） |
+| ウェアハウス | `BCAST_HANDSON_WH`（通常はXSMALL。重い処理だけLARGEへ一時拡大） |
 | ロール | `BCAST_ENGINEER_ROLE`（生データから集計まで） / `BCAST_ANALYST_ROLE`（集計データのみ） |
 
 ## サンプルデータの規模
