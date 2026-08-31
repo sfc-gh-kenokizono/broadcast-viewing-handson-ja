@@ -68,11 +68,13 @@ GitHub リポジトリ (CSV)
 | # | 章 | 目安 | 手順書 | 実行するもの |
 |---|---|---|---|---|
 | 0 | 環境の確認とワークスペースの用意 | 10 分 | [docs/step0_environment.md](docs/step0_environment.md) | [sql/step0_check.sql](sql/step0_check.sql) |
-| 1 | セットアップとデータの取り込み | 15 分 | [docs/step1_setup.md](docs/step1_setup.md) | [sql/step1_setup.sql](sql/step1_setup.sql) |
-| 基本機能 | Snowflake そのものの動きを体感する | 12 分 | [docs/step1_basics.md](docs/step1_basics.md) | [sql/step1_basics.sql](sql/step1_basics.sql) |
-| 2 | dbt でデータを変換する | 40 分 | [docs/step2_dbt.md](docs/step2_dbt.md) | `dbt/` のモデル |
-| 3 | セマンティックビューと検索サービス | 20 分 | [docs/step3_semantic.md](docs/step3_semantic.md) | [sql/step3_semantic.sql](sql/step3_semantic.sql) |
-| AI 関数 | AI 関数でテキストを数字の隣に並べる | 12 分 | [docs/step3_ai.md](docs/step3_ai.md) | [sql/step3_ai_functions.sql](sql/step3_ai_functions.sql) |
+| 1a | セットアップとデータの取り込み | 15 分 | [docs/step1a_setup.md](docs/step1a_setup.md) | [sql/step1a_setup.sql](sql/step1a_setup.sql) |
+| 1b | Snowflake そのものの動きを体感する（補足） | 12 分 | [docs/step1b_basics.md](docs/step1b_basics.md) | [sql/step1b_basics.sql](sql/step1b_basics.sql) |
+| 2a | dbt用ウェアハウスをLARGEへ変更 | 1 分 | [docs/step2_dbt.md](docs/step2_dbt.md) | [sql/step2a_dbt_scale_up.sql](sql/step2a_dbt_scale_up.sql) |
+| 2 | dbt でデータを変換する | 38 分 | [docs/step2_dbt.md](docs/step2_dbt.md) | Snowsightのdbt UIと`dbt/`のモデル |
+| 2b | ウェアハウスをXSMALLへ戻す | 1 分 | [docs/step2_dbt.md](docs/step2_dbt.md) | [sql/step2b_dbt_scale_down.sql](sql/step2b_dbt_scale_down.sql) |
+| 3a | セマンティックビューと検索サービス | 20 分 | [docs/step3a_semantic.md](docs/step3a_semantic.md) | [sql/step3a_semantic.sql](sql/step3a_semantic.sql) |
+| 3b | AI 関数でテキストを数字の隣に並べる（補足） | 12 分 | [docs/step3b_ai.md](docs/step3b_ai.md) | [sql/step3b_ai_functions.sql](sql/step3b_ai_functions.sql) |
 | 4 | エージェントを作り自然言語で分析する | 20 分 | [docs/step4_cowork.md](docs/step4_cowork.md) | [sql/step4_agent.sql](sql/step4_agent.sql) |
 | 5 | 可視化アプリを作る | 10 分 | [docs/step5_app.md](docs/step5_app.md) | [sql/step5_app.sql](sql/step5_app.sql) |
 | 6 | アクセス権とマスキング | 15 分 | [docs/step6_rbac.md](docs/step6_rbac.md) | [sql/step6_rbac.sql](sql/step6_rbac.sql) |
@@ -90,11 +92,13 @@ GitHub リポジトリ (CSV)
            ↓  API 統合ができる
          ワークスペースを作る（画面操作）
            ↓  リポジトリの中身が全部そろう
-第 1 章  ワークスペースで sql/step1_setup.sql を開いて実行
-基本機能   ワークスペースで sql/step1_basics.sql を開いて実行
-第 2 章  LARGEへ拡大 → dbt/ を動かす → XSMALLへ戻す
-第 3 章  ワークスペースで sql/step3_semantic.sql を開いて実行
-AI 関数   ワークスペースで sql/step3_ai_functions.sql を開いて実行
+第 1a 章 ワークスペースで sql/step1a_setup.sql を開いて実行
+第 1b 章 ワークスペースで sql/step1b_basics.sql を開いて実行（補足）
+第 2a 章 sql/step2a_dbt_scale_up.sql でLARGEへ変更
+第 2 章  Snowsightのdbt UIで実行・テスト
+第 2b 章 sql/step2b_dbt_scale_down.sql でXSMALLへ戻す
+第 3a 章 ワークスペースで sql/step3a_semantic.sql を開いて実行
+第 3b 章 ワークスペースで sql/step3b_ai_functions.sql を開いて実行（補足）
 第 4 章  ワークスペースで sql/step4_agent.sql を開いて実行
 第 5 章  ワークスペースで sql/step5_app.sql を開いて実行
 第 6 章  ワークスペースで sql/step6_rbac.sql を開いて実行

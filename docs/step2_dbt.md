@@ -302,7 +302,7 @@ SQL を開いた状態で、右上の **View Compiled SQL** を選びます。�
 dbt は 9 個のモデルをまとめて作ります。待つだけの時間を短くするため、ここでは
 **計算を担当するウェアハウスを、一時的に LARGE にします。**
 
-左側のファイル一覧から `sql/step2_dbt_scale_up.sql` を開き、**ファイル全体を実行**してください。
+左側のファイル一覧から `sql/step2a_dbt_scale_up.sql` を開き、**ファイル全体を実行**してください。
 
 ```text
 XSMALL  = 小さな計算機。料金は低いが、重い処理では待ちやすい
@@ -405,7 +405,7 @@ Done. PASS=16 WARN=0 ERROR=0 SKIP=0
 
 ### テストが終わったら XSMALL に戻す 💰
 
-左側のファイル一覧から `sql/step2_dbt_scale_down.sql` を開き、**ファイル全体を実行**してください。
+左側のファイル一覧から `sql/step2b_dbt_scale_down.sql` を開き、**ファイル全体を実行**してください。
 
 ```text
 LARGEでdbtを短時間に処理 🚀
@@ -670,4 +670,4 @@ ALTER TASK BCAST_VIEWING_HANDSON.MART.RUN_BCAST_DBT SUSPEND;
 
 ## 次へ
 
-[第 3 章 セマンティックビューと検索サービス](step3_semantic.md)
+[第 3a 章 セマンティックビューと検索サービス](step3a_semantic.md)
