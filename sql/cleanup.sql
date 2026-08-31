@@ -73,8 +73,8 @@ DROP API INTEGRATION IF EXISTS BCAST_GIT_API;
 -- -----------------------------------------------------------------------------
 -- 9. ロール
 -- -----------------------------------------------------------------------------
-DROP ROLE IF EXISTS BCAST_ANALYST;
-DROP ROLE IF EXISTS BCAST_ENGINEER;
+DROP ROLE IF EXISTS BCAST_ANALYST_ROLE;
+DROP ROLE IF EXISTS BCAST_ENGINEER_ROLE;
 
 -- -----------------------------------------------------------------------------
 -- 10. ワークスペース

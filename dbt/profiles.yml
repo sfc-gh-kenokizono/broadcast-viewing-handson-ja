@@ -4,7 +4,7 @@
 # ワークスペースで実行するときは、いまログインしているアカウントとユーザーの
 # 文脈でそのまま動くためです。空文字にしておきます。
 #
-# role にはこのハンズオンで作った BCAST_ENGINEER を指定します。
+# role にはこのハンズオンで作った BCAST_ENGINEER_ROLE を指定します。
 # 生データを読み、STG / INT / MART にオブジェクトを作れるロールです。
 
 bcast:
@@ -14,7 +14,7 @@ bcast:
       type: snowflake
       account: ''
       user: ''
-      role: BCAST_ENGINEER
+      role: BCAST_ENGINEER_ROLE
       database: BCAST_VIEWING_HANDSON
       schema: STG
       warehouse: BCAST_HANDSON_WH

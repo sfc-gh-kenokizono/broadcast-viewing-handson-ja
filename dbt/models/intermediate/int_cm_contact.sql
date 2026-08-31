@@ -12,6 +12,9 @@ select
     v.COMMON_ID,
     v.IP_ADDRESS
 from {{ source('raw', 'CM_SPOT') }} sp
+inner join {{ source('raw', 'CM_MASTER') }} cm
+    on sp.CM_ID = cm.CM_ID
+   and cm.IS_ANALYSIS_TARGET
 inner join {{ ref('stg_viewing_log') }} v
     on v.NETWORK_ID = sp.NETWORK_ID
    and sp.AIR_AT >= v.VIEW_FROM

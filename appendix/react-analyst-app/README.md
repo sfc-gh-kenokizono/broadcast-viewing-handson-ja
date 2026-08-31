@@ -42,7 +42,7 @@ Snowflake 側に以下が作成済みであること（ハンズオン本編の 
 | セマンティックビュー | `BCAST_VIEWING_HANDSON.MART.SV_BROADCAST_VIEWING` |
 | 検索サービス | `BCAST_VIEWING_HANDSON.MART.SVC_PROGRAM_CM_META` |
 | ウェアハウス | `BCAST_HANDSON_WH` |
-| ロール | `BCAST_ANALYST` |
+| ロール | `BCAST_ANALYST_ROLE` |
 
 必要な権限:
 

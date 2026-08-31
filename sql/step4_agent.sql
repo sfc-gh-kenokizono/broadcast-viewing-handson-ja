@@ -1,7 +1,7 @@
 -- =============================================================================
 -- 第 4 章  エージェントを作り自然言語で分析する
 -- =============================================================================
--- 実行するロール: BCAST_ENGINEER（権限付与の部分だけ ACCOUNTADMIN）
+-- 実行するロール: BCAST_ENGINEER_ROLE（権限付与の部分だけ ACCOUNTADMIN）
 -- 所要時間の目安: 20 分
 --
 -- このスクリプトでやること
@@ -16,7 +16,7 @@
 -- あるいは両方を順番に使うかを決めて動きます。
 -- =============================================================================
 
-USE ROLE BCAST_ENGINEER;
+USE ROLE BCAST_ENGINEER_ROLE;
 USE WAREHOUSE BCAST_HANDSON_WH;
 USE SCHEMA BCAST_VIEWING_HANDSON.MART;
 
@@ -176,8 +176,8 @@ $$;
 
 USE ROLE ACCOUNTADMIN;
 
-GRANT USAGE ON AGENT BCAST_VIEWING_HANDSON.MART.BCAST_VIEWING_AGENT TO ROLE BCAST_ANALYST;
-GRANT USAGE ON AGENT BCAST_VIEWING_HANDSON.MART.BCAST_VIEWING_AGENT TO ROLE BCAST_ENGINEER;
+GRANT USAGE ON AGENT BCAST_VIEWING_HANDSON.MART.BCAST_VIEWING_AGENT TO ROLE BCAST_ANALYST_ROLE;
+GRANT USAGE ON AGENT BCAST_VIEWING_HANDSON.MART.BCAST_VIEWING_AGENT TO ROLE BCAST_ENGINEER_ROLE;
 
 -- ここが引っかかりやすいところです。
 -- CoWork から使うときの権限は、いま画面で選んでいるロールではなく
@@ -198,7 +198,7 @@ FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))
 WHERE "name" = $my_user;
 
 -- 空になっている場合は次のように指定します。
--- ALTER USER IDENTIFIER($my_user) SET DEFAULT_ROLE = 'BCAST_ENGINEER';
+-- ALTER USER IDENTIFIER($my_user) SET DEFAULT_ROLE = 'BCAST_ENGINEER_ROLE';
 -- ALTER USER IDENTIFIER($my_user) SET DEFAULT_WAREHOUSE = 'BCAST_HANDSON_WH';
 
 -- =============================================================================
@@ -217,13 +217,13 @@ SHOW SNOWFLAKE INTELLIGENCES;
 --
 -- ALTER SNOWFLAKE INTELLIGENCE <名前>
 --   ADD AGENT BCAST_VIEWING_HANDSON.MART.BCAST_VIEWING_AGENT;
--- GRANT USAGE ON SNOWFLAKE INTELLIGENCE <名前> TO ROLE BCAST_ANALYST;
+-- GRANT USAGE ON SNOWFLAKE INTELLIGENCE <名前> TO ROLE BCAST_ANALYST_ROLE;
 
 -- =============================================================================
 -- 4. 動作確認
 -- =============================================================================
 
-USE ROLE BCAST_ENGINEER;
+USE ROLE BCAST_ENGINEER_ROLE;
 
 -- 作られたことの確認
 SHOW AGENTS IN SCHEMA BCAST_VIEWING_HANDSON.MART;

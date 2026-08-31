@@ -92,7 +92,7 @@ SET current_user_name = (SELECT CURRENT_USER());
 -- 変数に何が入ったか確認する
 SELECT $current_user_name AS "変数の中身";
 
-GRANT ROLE BCAST_ENGINEER TO USER IDENTIFIER($current_user_name);
+GRANT ROLE BCAST_ENGINEER_ROLE TO USER IDENTIFIER($current_user_name);
 ```
 
 `SET` で入れた値は、`$` を付けて参照します。**中身を確認する行を挟んでおくと、うまくいかないときに切り分けが早くなります。**

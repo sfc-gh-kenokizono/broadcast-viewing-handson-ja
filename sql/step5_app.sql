@@ -50,7 +50,7 @@ CREATE OR REPLACE STREAMLIT BCAST_VIEWING_APP
   COMMENT = '放送視聴データの可視化アプリ';
 
 -- アナリストにも見せる
-GRANT USAGE ON STREAMLIT BCAST_VIEWING_APP TO ROLE BCAST_ANALYST;
+GRANT USAGE ON STREAMLIT BCAST_VIEWING_APP TO ROLE BCAST_ANALYST_ROLE;
 
 SHOW STREAMLITS LIKE 'BCAST_VIEWING_APP';
 
@@ -63,7 +63,7 @@ SHOW STREAMLITS LIKE 'BCAST_VIEWING_APP';
 -- Streamlit は所有者権限で動きます。
 -- ここでは ACCOUNTADMIN で作っているので、ACCOUNTADMIN の権限で動きます。
 -- 第 1 章でカスタムロールを SYSADMIN の下にぶら下げているため、
--- ACCOUNTADMIN から BCAST_ENGINEER が作ったテーブルに到達できます。
+-- ACCOUNTADMIN から BCAST_ENGINEER_ROLE が作ったテーブルに到達できます。
 -- あの GRANT を省くと、ここで
 -- 「Insufficient privileges to operate on table」で落ちます。
 

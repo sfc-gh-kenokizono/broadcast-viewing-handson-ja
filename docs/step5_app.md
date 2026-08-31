@@ -35,7 +35,7 @@
 
 Streamlit は**作成したロールの権限で動きます**（所有者権限）。このファイルは `ACCOUNTADMIN` で実行するので、`ACCOUNTADMIN` の権限で動きます。
 
-第 1 章でカスタムロールを `SYSADMIN` の下にぶら下げているため、`ACCOUNTADMIN` から `BCAST_ENGINEER` が作ったテーブルに到達できます。**あの `GRANT ROLE` を省くと、ここで `Insufficient privileges to operate on table` で落ちます。**
+第 1 章でカスタムロールを `SYSADMIN` の下にぶら下げているため、`ACCOUNTADMIN` から `BCAST_ENGINEER_ROLE` が作ったテーブルに到達できます。**あの `GRANT ROLE` を省くと、ここで `Insufficient privileges to operate on table` で落ちます。**
 
 権限の設計を間違えると動かない、という形で現れる箇所です。
 
@@ -112,15 +112,15 @@ Streamlit はスクリプト全体を上から下まで実行するので、**�
 
 Streamlit は所有者権限で動きます。エラー文にある `The owner role ... must have SELECT granted on TABLE ...` が示すとおり、**アプリを作ったロールがマート層を読めていません**。
 
-マート層のテーブルは `BCAST_ENGINEER` が作ったので、そのロールへの経路がないロール（たとえば `ACCOUNTADMIN` にカスタムロールを繋いでいない状態）でアプリを作ると再現します。次のどちらかで解消します。
+マート層のテーブルは `BCAST_ENGINEER_ROLE` が作ったので、そのロールへの経路がないロール（たとえば `ACCOUNTADMIN` にカスタムロールを繋いでいない状態）でアプリを作ると再現します。次のどちらかで解消します。
 
 ```sql
--- 案 1: アプリを BCAST_ANALYST ロールで作り直す（推奨）
+-- 案 1: アプリを BCAST_ANALYST_ROLE ロールで作り直す（推奨）
 
 -- 案 2: カスタムロールを SYSADMIN の下にぶら下げる（第 1 章に含めてあります）
 USE ROLE ACCOUNTADMIN;
-GRANT ROLE BCAST_ENGINEER TO ROLE SYSADMIN;
-GRANT ROLE BCAST_ANALYST  TO ROLE SYSADMIN;
+GRANT ROLE BCAST_ENGINEER_ROLE TO ROLE SYSADMIN;
+GRANT ROLE BCAST_ANALYST_ROLE  TO ROLE SYSADMIN;
 ```
 
 カスタムロールを作ったら `SYSADMIN` の下に繋ぐ、というのが Snowflake の推奨構成です。ここを飛ばすと、管理者ロールでも他ロールが作ったオブジェクトに手が届きません。

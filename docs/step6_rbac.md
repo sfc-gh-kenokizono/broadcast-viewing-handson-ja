@@ -20,14 +20,14 @@
 
 | ロール | 見られる層 |
 |---|---|
-| `BCAST_ENGINEER` | `RAW` / `STG` / `INT` / `MART` すべて |
-| `BCAST_ANALYST` | `MART` だけ |
+| `BCAST_ENGINEER_ROLE` | `RAW` / `STG` / `INT` / `MART` すべて |
+| `BCAST_ANALYST_ROLE` | `MART` だけ |
 
 ### 先に副ロールを切っておく
 
 ここで 1 つ大事な前置きがあります。
 
-Snowflake のユーザーには**副ロール**という設定があり、既定では使えるロールすべてが副ロールとして有効になっています。この状態だと `USE ROLE` でロールを切り替えても、元のロールの権限がセッションに残ります。つまり `ACCOUNTADMIN` を持っている人が `BCAST_ANALYST` に切り替えても、生データが見えたままになります。
+Snowflake のユーザーには**副ロール**という設定があり、既定では使えるロールすべてが副ロールとして有効になっています。この状態だと `USE ROLE` でロールを切り替えても、元のロールの権限がセッションに残ります。つまり `ACCOUNTADMIN` を持っている人が `BCAST_ANALYST_ROLE` に切り替えても、生データが見えたままになります。
 
 自分の設定を確認します。
 
@@ -42,7 +42,7 @@ FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "name" = $my_user;
 `["ALL"]` と表示されたら、すべてのロールが副ロールとして有効です。権限の効き方を確かめるときは、副ロールを切ってください。
 
 ```sql
-USE ROLE BCAST_ANALYST;
+USE ROLE BCAST_ANALYST_ROLE;
 USE SECONDARY ROLES NONE;
 
 SELECT CURRENT_ROLE() AS "主ロール", CURRENT_SECONDARY_ROLES() AS "副ロール";
@@ -66,7 +66,7 @@ SELECT COUNT(*) FROM BCAST_VIEWING_HANDSON.RAW.VIEWING_LOG_NW01;
 
 ### セマンティックビューは別扱い
 
-同じ `BCAST_ANALYST` でも、セマンティックビューは参照できます。
+同じ `BCAST_ANALYST_ROLE` でも、セマンティックビューは参照できます。
 
 ```sql
 SELECT * FROM SEMANTIC_VIEW(
@@ -81,7 +81,7 @@ SELECT * FROM SEMANTIC_VIEW(
 これは第 3 章で 1 行渡しただけの結果です。
 
 ```sql
-GRANT SELECT, REFERENCES ON SEMANTIC VIEW ... TO ROLE BCAST_ANALYST;
+GRANT SELECT, REFERENCES ON SEMANTIC VIEW ... TO ROLE BCAST_ANALYST_ROLE;
 ```
 
 生データには一切触れられないロールでも、決めた指標だけは見られる。この形が作れることが、指標の定義を Snowflake 側に置いておく利点のひとつになります。
@@ -96,7 +96,7 @@ IP アドレスは外部のデータと突き合わせるための鍵になる�
 CREATE OR REPLACE MASKING POLICY MASK_IP_ADDRESS AS (VAL VARCHAR)
   RETURNS VARCHAR ->
     CASE
-      WHEN IS_ROLE_IN_SESSION('BCAST_ENGINEER') THEN VAL
+      WHEN IS_ROLE_IN_SESSION('BCAST_ENGINEER_ROLE') THEN VAL
       ELSE REGEXP_REPLACE(VAL, '\\.[0-9]+$', '.*')
     END;
 
@@ -108,11 +108,11 @@ ALTER TABLE MART_DEVICE_DAILY MODIFY COLUMN IP_ADDRESS SET MASKING POLICY MASK_I
 ### 効き方を見る
 
 ```sql
-USE ROLE BCAST_ENGINEER;
+USE ROLE BCAST_ENGINEER_ROLE;
 SELECT IP_ADDRESS FROM BCAST_VIEWING_HANDSON.MART.MART_DEVICE_DAILY LIMIT 5;
 -- 192.0.2.145 のようにそのまま見える
 
-USE ROLE BCAST_ANALYST;
+USE ROLE BCAST_ANALYST_ROLE;
 SELECT IP_ADDRESS FROM BCAST_VIEWING_HANDSON.MART.MART_DEVICE_DAILY LIMIT 5;
 -- 192.0.2.* のように末尾が隠れる
 ```
@@ -155,8 +155,8 @@ FROM TABLE(
 ```sql
 CREATE OR REPLACE ROW ACCESS POLICY RAP_NETWORK AS (NETWORK_ID VARCHAR)
   RETURNS BOOLEAN ->
-    IS_ROLE_IN_SESSION('BCAST_ENGINEER')
-    OR IS_ROLE_IN_SESSION('BCAST_ANALYST')
+    IS_ROLE_IN_SESSION('BCAST_ENGINEER_ROLE')
+    OR IS_ROLE_IN_SESSION('BCAST_ANALYST_ROLE')
     OR EXISTS (
       SELECT 1 FROM NETWORK_ACCESS_MAP m
       WHERE m.NETWORK_ID = NETWORK_ID
@@ -171,7 +171,7 @@ ALTER TABLE MART_DEVICE_DAILY ADD ROW ACCESS POLICY RAP_NETWORK ON (NETWORK_ID);
 同じクエリを 2 つのロールで実行すると、返ってくる局の数が変わります。
 
 ```sql
-USE ROLE BCAST_ANALYST;      -- 5 局すべて
+USE ROLE BCAST_ANALYST_ROLE;      -- 5 局すべて
 USE ROLE BCAST_NW01_VIEWER;  -- 1 局だけ
 ```
 

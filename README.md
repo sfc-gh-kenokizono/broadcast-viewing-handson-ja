@@ -111,7 +111,7 @@ GitHub リポジトリ (CSV)
 | データベース | `BCAST_VIEWING_HANDSON` |
 | スキーマ | `RAW` / `STG` / `INT` / `MART` / `INTEGRATIONS` |
 | ウェアハウス | `BCAST_HANDSON_WH`（XSMALL。第 1 章補で一時的に LARGE にして戻します） |
-| ロール | `BCAST_ENGINEER`（生データから集計まで） / `BCAST_ANALYST`（集計データのみ） |
+| ロール | `BCAST_ENGINEER_ROLE`（生データから集計まで） / `BCAST_ANALYST_ROLE`（集計データのみ） |
 
 ## サンプルデータの規模
 

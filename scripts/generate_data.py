@@ -19,8 +19,9 @@ Git リポジトリステージ経由で COPY INTO する。
   - 視聴は番組の放送枠に紐づけて発生させる。そうしないと番組別の集計が意味を持たない。
   - 端末の嗜好は「強すぎない」ようにする。作られたデータに見えないための調整。
   - クレンジングの章が空回りしないよう、異常値と欠落を意図的に混ぜる。
-  - コマーシャルには出稿期間を持たせる。実際の出稿は常に流れ続けるのではなく、
-    2 週間から 4 週間の枚を買う形になるため。
+  - 番組表は各局 4 時から 24 時まで切れ目なく編成する。
+  - コマーシャルは 20 分ごとの 3 分ブレークに、6 / 15 / 30 秒素材を並べる。
+    CM_SPOT は局全体の在庫、AI 分析は IS_ANALYSIS_TARGET が TRUE の 20 素材に絞る。
 """
 
 from __future__ import annotations
@@ -57,16 +58,20 @@ NETWORK_SHARE = {"NW01": 0.27, "NW02": 0.23, "NW03": 0.20, "NW04": 0.17, "NW05":
 
 GENRES = ["ドラマ", "バラエティ", "アニメ", "ニュース", "スポーツ", "音楽", "映画", "情報"]
 
-# 時間帯ごとの視聴の出やすさ。ゴールデンに寄せる。
-# 深夜は 0 時台として扱う。24 時台にすると放送日と暦の日付がずれ、
-# その曜日に深夜番組しかない局の日が空になってしまう。
+# 時間帯ごとの視聴の出やすさ。時刻は番組の開始時刻から判定する。
+# ゴールデンを山にするが、以前のように 20 時台へ 70% 集中させない。
 TIME_SLOTS = {
-    "朝":       {"hour": 7,  "weight": 12},
-    "昼":       {"hour": 12, "weight": 8},
-    "夕方":     {"hour": 17, "weight": 10},
-    "ゴールデン": {"hour": 20, "weight": 40},
-    "深夜":     {"hour": 0,  "weight": 6},
+    "朝":         {"weight": 12},
+    "昼":         {"weight": 8},
+    "夕方":       {"weight": 14},
+    "ゴールデン": {"weight": 24},
+    "深夜":       {"weight": 7},
 }
+
+BROADCAST_START_HOUR = 4
+BROADCAST_END_HOUR = 24
+CM_BREAK_INTERVAL_MIN = 20
+CM_BREAK_DURATION_SEC = 180
 
 SEGMENTS = ["T", "F1", "F2", "F3", "M1", "M2", "M3"]
 
@@ -268,6 +273,19 @@ def dates_in_period():
         d += timedelta(days=1)
 
 
+def time_slot_for_hour(hour: int) -> str:
+    """番組・CMの開始時刻を、放送で使う時間帯に変換する。"""
+    if 4 <= hour < 9:
+        return "朝"
+    if 9 <= hour < 16:
+        return "昼"
+    if 16 <= hour < 19:
+        return "夕方"
+    if 19 <= hour < 23:
+        return "ゴールデン"
+    return "深夜"
+
+
 def write_csv(filename: str, header, rows, compress: bool = True):
     path = DATA_DIR / (filename + (".gz" if compress else ""))
     opener = (lambda: gzip.open(path, "wt", encoding="utf-8", newline="")) if compress \
@@ -342,7 +360,10 @@ def build_programs(rng: random.Random):
     for idx, (genre, slot, title) in enumerate(PROGRAM_TITLES):
         network_id = NETWORKS[idx % len(NETWORKS)][0]
         duration = weighted_choice(rng, [(30, 40), (60, 40), (90, 15), (120, 5)])
-        synopsis = rng.choice(SYNOPSIS_TEMPLATES[genre])
+        synopsis = (
+            rng.choice(SYNOPSIS_TEMPLATES[genre])
+            + f" 番組『{title}』では、毎回異なる題材を通じて{genre}ならではの見どころを届けます。"
+        )
         programs.append({
             "program_id": f"PG{idx + 1:04d}",
             "program_name": title,
@@ -362,24 +383,41 @@ def build_programs(rng: random.Random):
 
 
 def build_schedule(programs):
-    """番組の放送枠。毎週同じ曜日・同じ時刻に放送する。"""
+    """各局の 4 時から 24 時までを、番組で切れ目なく編成する。"""
     rows = []
-    for p in programs:
-        base_hour = TIME_SLOTS[p["time_slot"]]["hour"]
-        minute = 0 if p["duration_min"] >= 60 else 30 * ((int(p["program_id"][2:]) % 2))
-        for d in dates_in_period():
-            if d.weekday() != p["day_of_week"]:
-                continue
-            start = datetime(d.year, d.month, d.day, base_hour, minute)
-            rows.append({
-                "program_id": p["program_id"],
-                "network_id": p["network_id"],
-                "air_date": d,
-                "air_from": start,
-                "air_to": start + timedelta(minutes=p["duration_min"]),
-                "genre": p["genre"],
-                "time_slot": p["time_slot"],
-            })
+    programs_by_network = {
+        network_id: [p for p in programs if p["network_id"] == network_id]
+        for network_id, _, _ in NETWORKS
+    }
+
+    for day_index, d in enumerate(dates_in_period()):
+        day_start = datetime(d.year, d.month, d.day, BROADCAST_START_HOUR)
+        day_end = datetime(d.year, d.month, d.day) + timedelta(hours=BROADCAST_END_HOUR)
+        for network_index, (network_id, _, _) in enumerate(NETWORKS):
+            network_programs = programs_by_network[network_id]
+            start = day_start
+            slot_index = 0
+            while start < day_end:
+                slot_name = time_slot_for_hour(start.hour)
+                preferred = [p for p in network_programs if p["time_slot"] == slot_name]
+                pool = preferred or network_programs
+                p = pool[(day_index + network_index * 3 + slot_index) % len(pool)]
+                remaining_min = int((day_end - start).total_seconds() // 60)
+                duration_min = min(p["duration_min"], remaining_min)
+                if duration_min < 30:
+                    duration_min = remaining_min
+                finish = start + timedelta(minutes=duration_min)
+                rows.append({
+                    "program_id": p["program_id"],
+                    "network_id": network_id,
+                    "air_date": d,
+                    "air_from": start,
+                    "air_to": finish,
+                    "genre": p["genre"],
+                    "time_slot": slot_name,
+                })
+                start = finish
+                slot_index += 1
     return rows
 
 
@@ -506,75 +544,132 @@ def inject_anomalies(rng: random.Random, by_network):
     return counts
 
 
-def build_cm(rng: random.Random, schedule, n_spots: int):
-    """コマーシャルのマスタと放送実績。
+def build_cm(rng: random.Random, schedule):
+    """コマーシャル素材のマスタと、局全体の放送実績。
 
-    実際の出稿には期間があります。3 ヶ月ずっと同じコマーシャルが同じ本数
-    流れ続けることはなく、2 週間から 4 週間の枠を買って集中的に打ちます。
-    ここで期間を持たせておくと、「6 月のこのキャンペーンは何台に届いたか」
-    という実務の聞き方がそのまま成立します。
-
-    CM0001 だけは本数を多めにして、フリークエンシーの分布に差を作る。
+    各局に 20 分ごと・3 分間のブレークを作り、6 / 15 / 30 秒素材で埋める。
+    最初の 20 素材だけをハンズオンの分析対象とし、残り 80 素材は局全体の
+    CM 在庫を現実的にする背景素材として扱う。
     """
-    cm_ids = [f"CM{i + 1:04d}" for i in range(len(ADVERTISERS))]
-
-    # コマーシャルごとの出稿期間。期間の長さは 2 週間から 4 週間。
-    campaign = {}
-    for cm_id in cm_ids:
-        length = rng.choice([14, 21, 28])
-        start = PERIOD_START + timedelta(days=rng.randint(0, max(0, PERIOD_DAYS - length)))
-        campaign[cm_id] = (start, start + timedelta(days=length - 1))
+    creative_specs = []
+    for advertiser_index, (category, advertiser, desc) in enumerate(ADVERTISERS):
+        for variant in range(5):
+            creative_index = advertiser_index * 5 + variant
+            cm_id = f"CM{creative_index + 1:04d}"
+            is_target = variant == 0
+            if is_target:
+                creative_desc = desc
+            else:
+                angles = ["商品特長", "利用場面", "季節感", "企業姿勢"]
+                creative_desc = (
+                    f"{desc} 同じ広告主の別素材として、{angles[variant - 1]}を中心に構成し、"
+                    f"終盤で『{advertiser}』の名称を表示します。"
+                )
+            if is_target:
+                length = [14, 21, 28][advertiser_index % 3]
+                max_start = max(0, PERIOD_DAYS - length + 1)
+                start_offset = (advertiser_index * 11) % (max_start + 1) if max_start else 0
+                campaign_from = PERIOD_START + timedelta(days=start_offset)
+                campaign_to = campaign_from + timedelta(days=length - 1)
+            else:
+                # 局全体の通常在庫を表す背景素材。分析対象キャンペーンと違い、
+                # 全期間を通じてブレークを埋められるようにする。
+                campaign_from = PERIOD_START
+                campaign_to = PERIOD_END
+            first_network = creative_index % len(NETWORKS)
+            target_networks = {
+                NETWORKS[first_network][0],
+                NETWORKS[(first_network + 1 + creative_index % 3) % len(NETWORKS)][0],
+            }
+            slot_names = list(TIME_SLOTS)
+            target_slots = {
+                slot_names[creative_index % len(slot_names)],
+                slot_names[(creative_index + 2) % len(slot_names)],
+            }
+            creative_specs.append({
+                "cm_id": cm_id,
+                "category": category,
+                "advertiser": advertiser,
+                "duration_sec": [15, 15, 15, 30, 6][variant],
+                "creative_desc": creative_desc,
+                "campaign_from": campaign_from,
+                "campaign_to": campaign_to,
+                "is_analysis_target": is_target,
+                "target_networks": target_networks,
+                "target_slots": target_slots,
+            })
 
     master = []
-    for idx, (category, advertiser, desc) in enumerate(ADVERTISERS):
-        cm_id = f"CM{idx + 1:04d}"
-        c_from, c_to = campaign[cm_id]
+    for spec in creative_specs:
         master.append([
-            cm_id,
-            advertiser,
-            category,
-            weighted_choice(rng, [(15, 70), (30, 25), (6, 5)]),
-            desc,
-            c_from.isoformat(),
-            c_to.isoformat(),
+            spec["cm_id"],
+            spec["advertiser"],
+            spec["category"],
+            spec["duration_sec"],
+            spec["creative_desc"],
+            spec["campaign_from"].isoformat(),
+            spec["campaign_to"].isoformat(),
+            spec["is_analysis_target"],
         ])
 
-    cm_weights = [90 if i == 0 else 30 for i in range(len(ADVERTISERS))]
-
-    # 実際の出稿は「この局のこの時間帯の枠を買う」形になる。
-    # 全局・全時間帯にばらまくと、どのコマーシャルもほぼ全部の受信機に届いてしまい、
-    # リーチとフリークエンシーに差が出なくなる。
-    slot_names = ["ゴールデン", "夕方", "深夜", "朝", "昼"]
-    network_ids = [n[0] for n in NETWORKS]
-    cm_target = {
-        cm: (network_ids[i % len(network_ids)], slot_names[(i // len(network_ids)) % len(slot_names)])
-        for i, cm in enumerate(cm_ids)
-    }
-
-    by_target = {}
-    for s in schedule:
-        by_target.setdefault((s["network_id"], s["time_slot"]), []).append(s)
-
-    # 買った枠のうち、出稿期間に入っているものだけを候補にする
-    candidates_of = {}
-    for cm_id in cm_ids:
-        c_from, c_to = campaign[cm_id]
-        slots = by_target.get(cm_target[cm_id]) or schedule
-        in_window = [s for s in slots if c_from <= s["air_date"] <= c_to]
-        candidates_of[cm_id] = in_window or slots
-
-    picked_cms = rng.choices(cm_ids, weights=cm_weights, k=n_spots)
     spots = []
-    for i, cm_id in enumerate(picked_cms):
-        slot = rng.choice(candidates_of[cm_id])
-        span_min = int((slot["air_to"] - slot["air_from"]).total_seconds() // 60)
-        air_at = slot["air_from"] + timedelta(minutes=rng.randint(0, max(0, span_min - 1)))
-        spots.append([
-            f"SP{i + 1:06d}",
-            cm_id,
-            slot["network_id"],
-            air_at.strftime("%Y-%m-%d %H:%M:%S"),
-        ])
+    spot_number = 1
+    for d in dates_in_period():
+        for network_id, _, _ in NETWORKS:
+            day_start = datetime(d.year, d.month, d.day, BROADCAST_START_HOUR)
+            total_minutes = (BROADCAST_END_HOUR - BROADCAST_START_HOUR) * 60
+            for break_index, break_offset in enumerate(
+                    range(CM_BREAK_INTERVAL_MIN - 3, total_minutes, CM_BREAK_INTERVAL_MIN)):
+                break_start = day_start + timedelta(minutes=break_offset)
+                slot_name = time_slot_for_hour(break_start.hour)
+                eligible = [
+                    spec for spec in creative_specs
+                    if spec["campaign_from"] <= d <= spec["campaign_to"]
+                    and network_id in spec["target_networks"]
+                    and slot_name in spec["target_slots"]
+                ]
+                if not eligible:
+                    eligible = [
+                        spec for spec in creative_specs
+                        if spec["campaign_from"] <= d <= spec["campaign_to"]
+                        and network_id in spec["target_networks"]
+                    ]
+                if not eligible:
+                    eligible = [
+                        spec for spec in creative_specs
+                        if spec["campaign_from"] <= d <= spec["campaign_to"]
+                    ]
+
+                # どの並びも合計 180 秒。ランダムに尺を選ぶと 9 秒などの端数が
+                # 残るため、放送枠として成立する組み合わせを先に決めておく。
+                duration_patterns = [
+                    [15] * 12,
+                    [30] * 6,
+                    [6] * 5 + [15] * 10,
+                ]
+                durations = duration_patterns[(break_index + int(network_id[-1])) % len(duration_patterns)]
+                rng.shuffle(durations)
+                elapsed_sec = 0
+                for duration_sec in durations:
+                    fitting = [spec for spec in eligible if spec["duration_sec"] == duration_sec]
+                    if not fitting:
+                        fitting = [
+                            spec for spec in creative_specs
+                            if spec["duration_sec"] == duration_sec
+                            and spec["campaign_from"] <= d <= spec["campaign_to"]
+                        ]
+                    if not fitting:
+                        raise RuntimeError(f"{d} に {duration_sec} 秒素材がありません")
+                    spec = rng.choice(fitting)
+                    air_at = break_start + timedelta(seconds=elapsed_sec)
+                    spots.append([
+                        f"SP{spot_number:07d}",
+                        spec["cm_id"],
+                        network_id,
+                        air_at.strftime("%Y-%m-%d %H:%M:%S"),
+                    ])
+                    spot_number += 1
+                    elapsed_sec += duration_sec
     return master, spots
 
 
@@ -585,7 +680,6 @@ def main():
     parser.add_argument("--ips", type=int, default=12000, help="IP アドレスの数")
     parser.add_argument("--viewing-total", type=int, default=1050000,
                         help="視聴区間の合計行数。局ごとの配分は NETWORK_SHARE に従う")
-    parser.add_argument("--cm-spots", type=int, default=750)
     parser.add_argument("--panel", type=int, default=2000)
     parser.add_argument("--no-compress", action="store_true")
     args = parser.parse_args()
@@ -601,7 +695,7 @@ def main():
     panel_rows = assign_panel(rng, devices, args.panel)
     viewing = build_viewing_logs(rng, devices, schedule, args.viewing_total)
     anomaly_counts = inject_anomalies(rng, viewing)
-    cm_master, cm_spots = build_cm(rng, schedule, args.cm_spots)
+    cm_master, cm_spots = build_cm(rng, schedule)
 
     print("\n書き出しています ...")
     for network_id, _, _ in NETWORKS:
@@ -632,7 +726,7 @@ def main():
 
     write_csv("cm_master.csv",
               ["CM_ID", "ADVERTISER", "CATEGORY", "DURATION_SEC", "CREATIVE_DESC",
-               "CAMPAIGN_FROM", "CAMPAIGN_TO"],
+               "CAMPAIGN_FROM", "CAMPAIGN_TO", "IS_ANALYSIS_TARGET"],
               cm_master, compress)
 
     write_csv("cm_spot.csv",

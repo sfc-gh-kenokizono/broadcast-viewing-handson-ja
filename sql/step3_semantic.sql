@@ -1,7 +1,7 @@
 -- =============================================================================
 -- 第 3 章  セマンティックビューと検索サービス
 -- =============================================================================
--- 実行するロール: BCAST_ENGINEER
+-- 実行するロール: BCAST_ENGINEER_ROLE
 -- 所要時間の目安: 20 分
 --
 -- このスクリプトでやること
@@ -15,7 +15,7 @@
 --   同じ定義が使われるので、画面ごとに数字が違うという事態が起きません。
 -- =============================================================================
 
-USE ROLE BCAST_ENGINEER;
+USE ROLE BCAST_ENGINEER_ROLE;
 USE WAREHOUSE BCAST_HANDSON_WH;
 USE SCHEMA BCAST_VIEWING_HANDSON.MART;
 
@@ -269,20 +269,20 @@ CREATE OR REPLACE CORTEX SEARCH SERVICE SVC_PROGRAM_CM_META
 USE ROLE ACCOUNTADMIN;
 
 GRANT SELECT, REFERENCES ON SEMANTIC VIEW BCAST_VIEWING_HANDSON.MART.SV_BROADCAST_VIEWING
-  TO ROLE BCAST_ANALYST;
+  TO ROLE BCAST_ANALYST_ROLE;
 GRANT USAGE ON CORTEX SEARCH SERVICE BCAST_VIEWING_HANDSON.MART.SVC_PROGRAM_CM_META
-  TO ROLE BCAST_ANALYST;
+  TO ROLE BCAST_ANALYST_ROLE;
 
 -- エンジニアのロールにも明示的に渡しておく（作成者なので実際には不要ですが、
 -- 権限の関係を分かりやすくするために書いています）
 GRANT SELECT, REFERENCES ON SEMANTIC VIEW BCAST_VIEWING_HANDSON.MART.SV_BROADCAST_VIEWING
-  TO ROLE BCAST_ENGINEER;
+  TO ROLE BCAST_ENGINEER_ROLE;
 
 -- =============================================================================
 -- 4. 動作確認
 -- =============================================================================
 
-USE ROLE BCAST_ENGINEER;
+USE ROLE BCAST_ENGINEER_ROLE;
 
 -- 定義された指標と切り口の一覧
 SHOW SEMANTIC METRICS IN BCAST_VIEWING_HANDSON.MART.SV_BROADCAST_VIEWING;

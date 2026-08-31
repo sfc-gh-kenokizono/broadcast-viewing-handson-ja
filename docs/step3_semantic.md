@@ -178,10 +178,10 @@ SELECT PARSE_JSON(
 セマンティックビューは、元になっているテーブルへの権限がなくても参照できます。
 
 ```sql
-GRANT SELECT, REFERENCES ON SEMANTIC VIEW ... TO ROLE BCAST_ANALYST;
+GRANT SELECT, REFERENCES ON SEMANTIC VIEW ... TO ROLE BCAST_ANALYST_ROLE;
 ```
 
-`BCAST_ANALYST` は `RAW` にも `STG` にも `INT` にも権限がありませんが、この 1 行だけで指標を見られるようになります。生データは限られた人だけ、指標は広く、という形が作れます。第 6 章でこの挙動を実際に確認します。
+`BCAST_ANALYST_ROLE` は `RAW` にも `STG` にも `INT` にも権限がありませんが、この 1 行だけで指標を見られるようになります。生データは限られた人だけ、指標は広く、という形が作れます。第 6 章でこの挙動を実際に確認します。
 
 ## 動作確認
 

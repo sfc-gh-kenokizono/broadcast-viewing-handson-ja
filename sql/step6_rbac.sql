@@ -1,7 +1,7 @@
 -- =============================================================================
 -- 第 6 章  アクセス権とマスキング
 -- =============================================================================
--- 実行するロール: ACCOUNTADMIN と BCAST_ANALYST を切り替えます
+-- 実行するロール: ACCOUNTADMIN と BCAST_ANALYST_ROLE を切り替えます
 -- 所要時間の目安: 15 分
 --
 -- このスクリプトでやること
@@ -19,8 +19,8 @@
 -- =============================================================================
 -- 第 1 章で 2 つのロールを作り、次のように権限を渡してありました。
 --
---   BCAST_ENGINEER   RAW / STG / INT / MART すべて
---   BCAST_ANALYST    MART だけ
+--   BCAST_ENGINEER_ROLE   RAW / STG / INT / MART すべて
+--   BCAST_ANALYST_ROLE    MART だけ
 --
 -- 実際にどうなるかを見ます。
 --
@@ -28,7 +28,7 @@
 -- Snowflake のユーザーには「副ロール」という設定があり、既定では
 -- 使えるロールすべてが副ロールとして有効になっています。この状態だと
 -- USE ROLE でロールを切り替えても、元のロールの権限がセッションに残ります。
--- つまり ACCOUNTADMIN を持っている人が BCAST_ANALYST に切り替えても、
+-- つまり ACCOUNTADMIN を持っている人が BCAST_ANALYST_ROLE に切り替えても、
 -- 生データが見えたままになります。
 --
 -- 権限の効き方を確かめるときは、副ロールを切っておく必要があります。
@@ -43,7 +43,7 @@ FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))
 WHERE "name" = $my_user;
 -- ["ALL"] と表示されたら、すべてのロールが副ロールとして有効です。
 
-USE ROLE BCAST_ANALYST;
+USE ROLE BCAST_ANALYST_ROLE;
 USE SECONDARY ROLES NONE;   -- これを入れないと、下の確認が意図どおりに動きません
 USE WAREHOUSE BCAST_HANDSON_WH;
 
@@ -88,7 +88,7 @@ CREATE OR REPLACE MASKING POLICY MASK_IP_ADDRESS AS (VAL VARCHAR)
   RETURNS VARCHAR ->
     CASE
       -- 生データまで扱えるロールには、そのまま見せる
-      WHEN IS_ROLE_IN_SESSION('BCAST_ENGINEER') THEN VAL
+      WHEN IS_ROLE_IN_SESSION('BCAST_ENGINEER_ROLE') THEN VAL
       -- それ以外には最後の区切りを隠す。地域の傾向は見えるが、
       -- 回線を特定することはできなくなる
       ELSE REGEXP_REPLACE(VAL, '\\.[0-9]+$', '.*')
@@ -107,7 +107,7 @@ ALTER TABLE BCAST_VIEWING_HANDSON.MART.MART_PROGRAM_VIEWING
 -- -----------------------------------------------------------------------------
 
 -- 生データまで扱えるロール。そのまま見えます。
-USE ROLE BCAST_ENGINEER;
+USE ROLE BCAST_ENGINEER_ROLE;
 USE SECONDARY ROLES NONE;
 SELECT IP_ADDRESS, COUNT(*) AS "行数"
 FROM BCAST_VIEWING_HANDSON.MART.MART_DEVICE_DAILY
@@ -116,7 +116,7 @@ ORDER BY 2 DESC
 LIMIT 5;
 
 -- 集計だけのロール。末尾が隠れます。
-USE ROLE BCAST_ANALYST;
+USE ROLE BCAST_ANALYST_ROLE;
 USE SECONDARY ROLES NONE;
 SELECT IP_ADDRESS, COUNT(*) AS "行数"
 FROM BCAST_VIEWING_HANDSON.MART.MART_DEVICE_DAILY
@@ -181,8 +181,8 @@ INSERT INTO NETWORK_ACCESS_MAP VALUES ('BCAST_NW01_VIEWER', 'NW01');
 CREATE OR REPLACE ROW ACCESS POLICY RAP_NETWORK AS (NETWORK_ID VARCHAR)
   RETURNS BOOLEAN ->
     -- 生データまで扱えるロールと、集計を広く見るロールは全局を見られる
-    IS_ROLE_IN_SESSION('BCAST_ENGINEER')
-    OR IS_ROLE_IN_SESSION('BCAST_ANALYST')
+    IS_ROLE_IN_SESSION('BCAST_ENGINEER_ROLE')
+    OR IS_ROLE_IN_SESSION('BCAST_ANALYST_ROLE')
     -- 局ごとの担当ロールは、対応表にある局の行だけ
     OR EXISTS (
       SELECT 1 FROM NETWORK_ACCESS_MAP m
@@ -194,7 +194,7 @@ CREATE OR REPLACE ROW ACCESS POLICY RAP_NETWORK AS (NETWORK_ID VARCHAR)
 ALTER TABLE MART_DEVICE_DAILY ADD ROW ACCESS POLICY RAP_NETWORK ON (NETWORK_ID);
 
 -- 効き方を見る。全局が見えます。
-USE ROLE BCAST_ANALYST;
+USE ROLE BCAST_ANALYST_ROLE;
 SELECT NETWORK_NAME, COUNT(DISTINCT COMMON_ID) AS "台数"
 FROM BCAST_VIEWING_HANDSON.MART.MART_DEVICE_DAILY
 GROUP BY NETWORK_NAME ORDER BY 1;

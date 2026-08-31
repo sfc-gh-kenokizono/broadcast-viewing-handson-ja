@@ -49,6 +49,7 @@ SELECT
   CATEGORY       AS "商品カテゴリ",
   CREATIVE_DESC  AS "素材の説明文"
 FROM CM_MASTER
+WHERE IS_ANALYSIS_TARGET
 ORDER BY CM_ID
 LIMIT 5;
 
@@ -93,6 +94,7 @@ SELECT
     ' / '
   )                                         AS "訴求軸"
 FROM CM_MASTER
+WHERE IS_ANALYSIS_TARGET
 ORDER BY CM_ID;
 
 -- 結果の見かた
@@ -130,6 +132,7 @@ FROM (
       }
     ) AS x
   FROM CM_MASTER
+  WHERE IS_ANALYSIS_TARGET
 )
 ORDER BY CM_ID;
 
@@ -159,6 +162,7 @@ SELECT
     'これらはテレビコマーシャルの素材説明文です。この商品カテゴリの素材に共通する表現の傾向を、日本語で 2 文以内にまとめてください。'
   )          AS "表現の傾向"
 FROM CM_MASTER
+WHERE IS_ANALYSIS_TARGET
 GROUP BY CATEGORY
 ORDER BY "素材数" DESC;
 
@@ -202,7 +206,8 @@ SELECT
       'task_description': 'テレビコマーシャルの素材説明文から、その素材がどの訴求軸を使っているかを判定してください'
     }
   ):labels::ARRAY AS APPEAL_AXES
-FROM CM_MASTER;
+FROM CM_MASTER
+WHERE IS_ANALYSIS_TARGET;
 
 SELECT COUNT(*) AS "判定した素材数" FROM BCAST_VIEWING_HANDSON.MART.CM_CREATIVE_TAGS;
 
