@@ -30,11 +30,8 @@ ALTER TABLE IF EXISTS BCAST_VIEWING_HANDSON.MART.MART_PROGRAM_VIEWING
   MODIFY COLUMN IP_ADDRESS UNSET MASKING POLICY;
 DROP MASKING POLICY IF EXISTS BCAST_VIEWING_HANDSON.MART.MASK_IP_ADDRESS;
 
--- 第 6 章の任意の部分を実行した場合だけ、次も必要です
--- ALTER TABLE BCAST_VIEWING_HANDSON.MART.MART_DEVICE_DAILY
---   DROP ROW ACCESS POLICY BCAST_VIEWING_HANDSON.MART.RAP_NETWORK;
--- DROP ROW ACCESS POLICY IF EXISTS BCAST_VIEWING_HANDSON.MART.RAP_NETWORK;
--- DROP ROLE IF EXISTS BCAST_NW01_VIEWER;
+-- 第6章の任意部分で作った行アクセスポリシーと対応表は、
+-- このあとのDROP DATABASEでまとめて削除されます。
 
 -- -----------------------------------------------------------------------------
 -- 4. スケジュール実行と dbt プロジェクト（第 2 章の任意の部分）
@@ -75,12 +72,15 @@ DROP API INTEGRATION IF EXISTS BCAST_GIT_API;
 -- -----------------------------------------------------------------------------
 DROP ROLE IF EXISTS BCAST_ANALYST_ROLE;
 DROP ROLE IF EXISTS BCAST_ENGINEER_ROLE;
+DROP ROLE IF EXISTS BCAST_NW01_VIEWER;
 
 -- -----------------------------------------------------------------------------
 -- 10. ワークスペース
 -- -----------------------------------------------------------------------------
 -- ワークスペースは Snowsight の画面から削除します。
 -- Projects、Workspaces を開き、ワークスペース名の横のメニューから Delete を選びます。
+-- 第0章で有効にしたCORTEX_ENABLED_CROSS_REGIONはアカウント共通設定です。
+-- このトライアルを他で使わない場合は、必要に応じて元の値へ戻してください。
 
 -- -----------------------------------------------------------------------------
 -- 残っていないことの確認

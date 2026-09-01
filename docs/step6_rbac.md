@@ -166,13 +166,15 @@ CREATE OR REPLACE ROW ACCESS POLICY RAP_NETWORK AS (ROW_NETWORK_ID VARCHAR)
 ALTER TABLE MART_DEVICE_DAILY ADD ROW ACCESS POLICY RAP_NETWORK ON (NETWORK_ID);
 ```
 
-対応表を別に持たせているところが要点です。局が増えたときにポリシーを書き換える必要がなく、表に 1 行足すだけで済みます。
+この任意デモでは `BCAST_NW01_VIEWER` に `MART_DEVICE_DAILY` だけを付与します。RAPを当てていない別のMART表を付与すると、そちらから全局分が見えるためです。対応表を別に持たせているので、局が増えたときはポリシーを書き換えず表に1行追加できます。
 
 同じクエリを 2 つのロールで実行すると、返ってくる局の数が変わります。
 
 ```sql
 USE ROLE BCAST_ANALYST_ROLE;      -- 5 局すべて
-USE ROLE BCAST_NW01_VIEWER;  -- 1 局だけ
+USE SECONDARY ROLES NONE;
+USE ROLE BCAST_NW01_VIEWER;       -- 1 局だけ
+USE SECONDARY ROLES NONE;
 ```
 
 ## 覚えておきたいこと
@@ -181,7 +183,7 @@ USE ROLE BCAST_NW01_VIEWER;  -- 1 局だけ
 
 マスキングポリシーと行アクセスポリシーは、列やテーブルに紐づいています。**テーブルを作り直すと外れます。**
 
-ふだんの `dbt run` はテーブルの中身を入れ替えるだけなので残りますが、`dbt run --full-refresh` のようにテーブルそのものを作り直すと外れます。
+このプロジェクトのMARTはテーブルとして作り直すため、通常の `dbt run` でもポリシーが外れる可能性があります。dbtを再実行したあとは、ポリシーが残っているか必ず確認します。
 
 実運用では、モデルを作り直したあとにポリシーを当て直す処理をパイプラインの最後に入れておきます。dbt の `post-hook` に書くのがひとつの方法です。
 

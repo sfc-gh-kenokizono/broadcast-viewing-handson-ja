@@ -13,9 +13,9 @@ select
     p.GENRE,
     case
         when hour(vp.PROGRAM_AIR_FROM) between 4 and 8 then '朝'
-        when hour(vp.PROGRAM_AIR_FROM) between 9 and 14 then '昼'
-        when hour(vp.PROGRAM_AIR_FROM) between 15 and 18 then '夕方'
-        when hour(vp.PROGRAM_AIR_FROM) between 19 and 21 then 'ゴールデン'
+        when hour(vp.PROGRAM_AIR_FROM) between 9 and 15 then '昼'
+        when hour(vp.PROGRAM_AIR_FROM) between 16 and 18 then '夕方'
+        when hour(vp.PROGRAM_AIR_FROM) between 19 and 22 then 'ゴールデン'
         else '深夜'
     end as TIME_SLOT,
     vp.NETWORK_ID,
@@ -51,9 +51,9 @@ group by
     p.GENRE,
     case
         when hour(vp.PROGRAM_AIR_FROM) between 4 and 8 then '朝'
-        when hour(vp.PROGRAM_AIR_FROM) between 9 and 14 then '昼'
-        when hour(vp.PROGRAM_AIR_FROM) between 15 and 18 then '夕方'
-        when hour(vp.PROGRAM_AIR_FROM) between 19 and 21 then 'ゴールデン'
+        when hour(vp.PROGRAM_AIR_FROM) between 9 and 15 then '昼'
+        when hour(vp.PROGRAM_AIR_FROM) between 16 and 18 then '夕方'
+        when hour(vp.PROGRAM_AIR_FROM) between 19 and 22 then 'ゴールデン'
         else '深夜'
     end,
     vp.NETWORK_ID,

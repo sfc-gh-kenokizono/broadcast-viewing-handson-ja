@@ -165,7 +165,9 @@ CREATE ROLE IF NOT EXISTS BCAST_NW01_VIEWER
 GRANT USAGE ON WAREHOUSE BCAST_HANDSON_WH TO ROLE BCAST_NW01_VIEWER;
 GRANT USAGE ON DATABASE BCAST_VIEWING_HANDSON TO ROLE BCAST_NW01_VIEWER;
 GRANT USAGE ON SCHEMA BCAST_VIEWING_HANDSON.MART TO ROLE BCAST_NW01_VIEWER;
-GRANT SELECT ON ALL TABLES IN SCHEMA BCAST_VIEWING_HANDSON.MART TO ROLE BCAST_NW01_VIEWER;
+-- この任意デモでは、行アクセスポリシーを当てる1表だけを公開します。
+-- 他のMART表まで付与すると、そちらから全局分を読めてしまうためです。
+GRANT SELECT ON TABLE BCAST_VIEWING_HANDSON.MART.MART_DEVICE_DAILY TO ROLE BCAST_NW01_VIEWER;
 
 SET current_user_name = (SELECT CURRENT_USER());
 SELECT $current_user_name AS "変数の中身";
@@ -197,24 +199,28 @@ ALTER TABLE MART_DEVICE_DAILY ADD ROW ACCESS POLICY RAP_NETWORK ON (NETWORK_ID);
 
 -- 効き方を見る。全局が見えます。
 USE ROLE BCAST_ANALYST_ROLE;
+USE SECONDARY ROLES NONE;
 SELECT NETWORK_NAME, COUNT(DISTINCT COMMON_ID) AS "台数"
 FROM BCAST_VIEWING_HANDSON.MART.MART_DEVICE_DAILY
 GROUP BY NETWORK_NAME ORDER BY 1;
 
 -- 第一放送ネットワークの担当ロール。1 局分だけになります。
 USE ROLE BCAST_NW01_VIEWER;
+USE SECONDARY ROLES NONE;
 SELECT NETWORK_NAME, COUNT(DISTINCT COMMON_ID) AS "台数"
 FROM BCAST_VIEWING_HANDSON.MART.MART_DEVICE_DAILY
 GROUP BY NETWORK_NAME ORDER BY 1;
+
+USE ROLE ACCOUNTADMIN;
+USE SECONDARY ROLES ALL;
 */
 
 -- =============================================================================
 -- 覚えておきたいこと
 -- =============================================================================
 -- マスキングポリシーと行アクセスポリシーは列やテーブルに紐づいています。
--- dbt でテーブルを作り直すと外れます。ふだんの dbt run では
--- テーブルの中身を入れ替えるだけなので残りますが、
--- dbt run --full-refresh のようにテーブルそのものを作り直すと外れます。
+-- このプロジェクトのMARTはテーブルとして作り直すため、通常のdbt runでも
+-- 外れる可能性があります。dbt再実行後はPOLICY_REFERENCESで確認します。
 --
 -- 実運用では、モデルを作り直したあとにポリシーを当て直す処理を
 -- パイプラインの最後に入れておきます。dbt の post-hook に書くのが
