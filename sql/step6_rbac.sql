@@ -53,14 +53,15 @@ SELECT CURRENT_ROLE() AS "主ロール", CURRENT_SECONDARY_ROLES() AS "副ロー
 -- 集計データは見られる
 SELECT COUNT(*) AS "行数" FROM BCAST_VIEWING_HANDSON.MART.MART_DEVICE_DAILY;
 
--- 生データは見られない。次はエラーになります。
+-- 生データは見られません。実際に SELECT すると権限エラーになり、ファイル全体の
+-- 実行が止まるため、ここでは権限一覧を使ってエラーを出さずに確認します。
 -- 「存在しないか権限がありません」という書き方になるので、
 -- 権限がないことと存在しないことが区別されません。これは意図的な仕様です。
 -- 見えてはいけないものについては、あるかないかも分からないほうが安全なためです。
-SELECT COUNT(*) FROM BCAST_VIEWING_HANDSON.RAW.VIEWING_LOG_NW01;
+SHOW GRANTS TO ROLE BCAST_ANALYST_ROLE;
 
--- 中間層も見られない
-SELECT COUNT(*) FROM BCAST_VIEWING_HANDSON.STG.STG_VIEWING_LOG;
+-- 結果に RAW / STG / INT スキーマの USAGE やテーブルの SELECT がなく、
+-- MART の権限だけがあれば意図どおりです。
 
 -- ただし、セマンティックビューは参照できます。
 -- 元になっているテーブルへの権限がなくても、セマンティックビューへの
@@ -124,8 +125,9 @@ GROUP BY IP_ADDRESS
 ORDER BY 2 DESC
 LIMIT 5;
 
--- 集計そのものは変わりません。世帯数を数える処理は、
--- 伏せ字がかかっていても同じ値を返します。
+-- IP_ADDRESS ではなく COMMON_ID で数える台数は変わりません。
+-- マスク後の IP_ADDRESS は複数の値が同じ表示にまとまるため、
+-- COUNT(DISTINCT IP_ADDRESS) は元の回線数と一致しません。
 SELECT COUNT(DISTINCT COMMON_ID) AS "台数"
 FROM BCAST_VIEWING_HANDSON.MART.MART_DEVICE_DAILY;
 
@@ -178,7 +180,7 @@ CREATE OR REPLACE TABLE NETWORK_ACCESS_MAP (
 INSERT INTO NETWORK_ACCESS_MAP VALUES ('BCAST_NW01_VIEWER', 'NW01');
 
 -- 行アクセスポリシー
-CREATE OR REPLACE ROW ACCESS POLICY RAP_NETWORK AS (NETWORK_ID VARCHAR)
+CREATE OR REPLACE ROW ACCESS POLICY RAP_NETWORK AS (ROW_NETWORK_ID VARCHAR)
   RETURNS BOOLEAN ->
     -- 生データまで扱えるロールと、集計を広く見るロールは全局を見られる
     IS_ROLE_IN_SESSION('BCAST_ENGINEER_ROLE')
@@ -186,7 +188,7 @@ CREATE OR REPLACE ROW ACCESS POLICY RAP_NETWORK AS (NETWORK_ID VARCHAR)
     -- 局ごとの担当ロールは、対応表にある局の行だけ
     OR EXISTS (
       SELECT 1 FROM NETWORK_ACCESS_MAP m
-      WHERE m.NETWORK_ID = NETWORK_ID
+      WHERE m.NETWORK_ID = ROW_NETWORK_ID
         AND IS_ROLE_IN_SESSION(m.ROLE_NAME)
     )
   COMMENT = '局ごとの担当ロールには自局の行だけを見せる';

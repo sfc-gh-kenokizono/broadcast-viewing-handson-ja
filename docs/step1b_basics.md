@@ -118,17 +118,21 @@ SELECT COUNT(*) FROM VIEWING_LOG_NW01;   -- 行数が一致することを確認
 `WHERE` を書き忘れた `UPDATE` や `DELETE` で、
 テーブルは残っているが中身が変わってしまった、という事故です。
 
-この場合はテーブル名のうしろに `AT` を付けて、過去の時点を読みます。
+この場合は、事故を起こしたクエリの ID を使って、その直前を読みます。
 
 ```sql
 DELETE FROM VIEWING_LOG_NW01;                              -- 事故
-SELECT COUNT(*) FROM VIEWING_LOG_NW01 AT(OFFSET => -300);  -- 5 分前を読む
+SET destructive_query_id = (SELECT LAST_QUERY_ID());      -- 事故のクエリ ID
+SELECT COUNT(*) FROM VIEWING_LOG_NW01
+  BEFORE(STATEMENT => $destructive_query_id);              -- 事故直前を読む
 INSERT INTO VIEWING_LOG_NW01
-  SELECT * FROM VIEWING_LOG_NW01 AT(OFFSET => -300);       -- 書き戻す
+  SELECT * FROM VIEWING_LOG_NW01
+    BEFORE(STATEMENT => $destructive_query_id);            -- 書き戻す
 ```
 
-`OFFSET` は秒数です。ほかに、時刻で指定する `AT(TIMESTAMP => ...)` や、
-「あのクエリの直前」を指す `BEFORE(STATEMENT => 'クエリID')` も使えます。
+固定の「5 分前」ではなく事故の直前を指定するため、テーブルを作った直後でも安全です。
+ほかに、秒数で指定する `AT(OFFSET => ...)` や、時刻で指定する
+`AT(TIMESTAMP => ...)` も使えます。
 
 要点は、**壊した本人が、誰にも頼まず、SELECT 文の書き方だけで復旧できる**ことです。
 

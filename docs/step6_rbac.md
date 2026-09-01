@@ -12,7 +12,7 @@
 
 `sql/step6_rbac.sql`
 
-ワークスペースの左側の一覧から `sql` フォルダを開き、このファイルを選んで上から順に実行します。コピーと貼り付けは必要ありません。
+ワークスペースの左側の一覧から `sql` フォルダを開き、このファイルを選んでファイル全体を実行します。コピーと貼り付けは必要ありません。権限がないことは、意図的なエラーではなく権限一覧で確認するため、途中で止まりません。
 
 ## 1. 層でアクセス権を分ける
 
@@ -58,11 +58,11 @@ SELECT CURRENT_ROLE() AS "主ロール", CURRENT_SECONDARY_ROLES() AS "副ロー
 -- 集計データは見られる
 SELECT COUNT(*) FROM BCAST_VIEWING_HANDSON.MART.MART_DEVICE_DAILY;
 
--- 生データは見られない
-SELECT COUNT(*) FROM BCAST_VIEWING_HANDSON.RAW.VIEWING_LOG_NW01;
+-- 権限一覧を確認する
+SHOW GRANTS TO ROLE BCAST_ANALYST_ROLE;
 ```
 
-2 つめはエラーになります。メッセージは「存在しないか権限がありません」という書き方です。権限がないことと、そもそも存在しないことが区別されません。これは意図的な仕様で、見えてはいけないものについては、あるかないかも分からないほうが安全という考え方です。
+結果に `MART` の権限はありますが、`RAW`、`STG`、`INT` の権限はありません。実際に生データを `SELECT` すると権限エラーになりますが、ハンズオンを途中停止させないため、このファイルではエラーを起こさず権限一覧で確認します。
 
 ### セマンティックビューは別扱い
 
@@ -119,13 +119,13 @@ SELECT IP_ADDRESS FROM BCAST_VIEWING_HANDSON.MART.MART_DEVICE_DAILY LIMIT 5;
 
 末尾だけを隠しているので、地域の傾向は見えますが、回線を特定することはできません。何をどこまで隠すかは要件によります。
 
-### 集計は変わらない
+### 台数の集計は変わらない
 
 ```sql
 SELECT COUNT(DISTINCT COMMON_ID) FROM BCAST_VIEWING_HANDSON.MART.MART_DEVICE_DAILY;
 ```
 
-伏せ字がかかっていても、台数を数える処理は同じ値を返します。見せ方を変えただけで、データそのものは変わっていないためです。
+伏せ字がかかっていても、`COMMON_ID` で台数を数える処理は同じ値を返します。データそのものは変わっていないためです。一方、マスク後の `IP_ADDRESS` は複数の値が同じ表示にまとまるため、`COUNT(DISTINCT IP_ADDRESS)` を回線数として使うことはできません。
 
 ### どこに当たっているかを確認する
 
@@ -153,13 +153,13 @@ FROM TABLE(
 3. その対応表を見て判定するポリシーをテーブルに当てる
 
 ```sql
-CREATE OR REPLACE ROW ACCESS POLICY RAP_NETWORK AS (NETWORK_ID VARCHAR)
+CREATE OR REPLACE ROW ACCESS POLICY RAP_NETWORK AS (ROW_NETWORK_ID VARCHAR)
   RETURNS BOOLEAN ->
     IS_ROLE_IN_SESSION('BCAST_ENGINEER_ROLE')
     OR IS_ROLE_IN_SESSION('BCAST_ANALYST_ROLE')
     OR EXISTS (
       SELECT 1 FROM NETWORK_ACCESS_MAP m
-      WHERE m.NETWORK_ID = NETWORK_ID
+      WHERE m.NETWORK_ID = ROW_NETWORK_ID
         AND IS_ROLE_IN_SESSION(m.ROLE_NAME)
     );
 

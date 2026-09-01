@@ -46,8 +46,8 @@ models:
 
   - name: mart_zapping_transition
     description: |
-      チャンネルの移動。局をまたいだ移動は 1 局のデータだけでは見えず、
-      5 局分を共通 ID で束ねたあとで初めて分かる。
+      ある局の視聴終了から30分以内に次に見た別の局。局をまたいだ行動は
+      1局のデータだけでは見えず、5局分を共通IDで束ねて初めて分かる。
     columns:
       - name: TRANSITION_COUNT
         tests:

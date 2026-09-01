@@ -219,7 +219,10 @@ SELECT
   ax.VALUE::STRING                 AS "訴求軸",
   COUNT(DISTINCT t.CM_ID)          AS "素材数",
   COUNT(DISTINCT f.COMMON_ID)      AS "リーチ（受信機数）",
-  ROUND(AVG(f.CONTACT_COUNT), 2)   AS "平均フリークエンシー",
+  ROUND(
+    SUM(f.CONTACT_COUNT) / NULLIF(COUNT(DISTINCT f.COMMON_ID), 0),
+    2
+  )                                AS "平均フリークエンシー",
   SUM(f.CONTACT_COUNT)             AS "インプレッション"
 FROM BCAST_VIEWING_HANDSON.MART.CM_CREATIVE_TAGS t
 INNER JOIN BCAST_VIEWING_HANDSON.MART.MART_FREQUENCY f
@@ -249,6 +252,6 @@ ORDER BY "リーチ（受信機数）" DESC;
 --     権限は既存のロールのまま使えます。
 --     結果は普通の列なので、そのまま GROUP BY や JOIN の材料になります。
 --
---   次の第 4 章では、これらの関数を人が書くのではなく、
---   質問に応じてエージェントが自分で選んで使う形にしていきます。
+--   CM_CREATIVE_TAGS は、文章から作った分類を数値分析へ組み合わせる例です。
+--   第 4 章のエージェントとは独立しているため、この任意章を飛ばしても進めます。
 -- =============================================================================

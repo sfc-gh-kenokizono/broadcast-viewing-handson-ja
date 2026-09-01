@@ -55,8 +55,8 @@ CREATE OR REPLACE SEMANTIC VIEW SV_BROADCAST_VIEWING
       COMMENT = '1 行が 1 つのコマーシャルと 1 台の受信機の組み合わせ。接触回数を持つ。放送の接触は実測でなく、視聴区間にスポットの放送時刻が入っていたかで判定した推定値',
 
     zapping AS BCAST_VIEWING_HANDSON.MART.MART_ZAPPING_TRANSITION
-      WITH SYNONYMS = ('チャンネル移動', 'ザッピング')
-      COMMENT = '局をまたいだチャンネル移動の集計'
+      WITH SYNONYMS = ('次に見た別チャンネル', 'チャンネル遷移')
+      COMMENT = '視聴終了から30分以内に次に見た別チャンネルの集計。間隔0分は直接変更、正の間隔は非視聴時間を挟む'
   )
 
   FACTS (
@@ -114,6 +114,9 @@ CREATE OR REPLACE SEMANTIC VIEW SV_BROADCAST_VIEWING
       COMMENT = 'その番組を見た端末の性年代。パネル分にしか値がない',
 
     -- 広告接触の切り口
+    cm_contact.cm_id AS CM_ID
+      WITH SYNONYMS = ('コマーシャルID', 'CM素材ID')
+      COMMENT = 'コマーシャル素材を一意に識別するID',
     cm_contact.advertiser AS ADVERTISER
       WITH SYNONYMS = ('広告主', 'スポンサー')
       COMMENT = '広告主の名前',
@@ -130,7 +133,7 @@ CREATE OR REPLACE SEMANTIC VIEW SV_BROADCAST_VIEWING
       WITH SYNONYMS = ('出稿終了日', 'キャンペーン終了日')
       COMMENT = 'そのコマーシャルの出稿期間の終了日。出稿は 2 週間から 4 週間で行われる',
 
-    -- チャンネル移動の切り口
+    -- 次に見た別チャンネルの切り口
     zapping.zapping_date AS VIEW_DATE
       WITH SYNONYMS = ('移動した日')
       COMMENT = 'チャンネルを移動した日',
@@ -148,8 +151,8 @@ CREATE OR REPLACE SEMANTIC VIEW SV_BROADCAST_VIEWING
       WITH SYNONYMS = ('リーチ', '到達台数', '視聴台数', '何台に届いたか')
       COMMENT = '1 回以上視聴した受信機の台数。重複を除いて数えている',
     device_daily.reach_households AS COUNT(DISTINCT device_daily.IP_ADDRESS)
-      WITH SYNONYMS = ('到達世帯数', '視聴世帯数')
-      COMMENT = '1 回以上視聴した世帯（回線）の数。1 つの回線に複数台あるため台数より少なくなる',
+      WITH SYNONYMS = ('到達IP数', '視聴IP数', '世帯到達の代理指標')
+      COMMENT = '1回以上視聴したIPアドレスの数。世帯数そのものではなく代理指標',
     device_daily.total_sessions AS SUM(device_daily.session_count)
       WITH SYNONYMS = ('視聴回数', '視聴区間の件数')
       COMMENT = '視聴回数の合計。重複を除いていないので人数ではない',
@@ -165,11 +168,11 @@ CREATE OR REPLACE SEMANTIC VIEW SV_BROADCAST_VIEWING
       WITH SYNONYMS = ('番組視聴台数', '番組のリーチ')
       COMMENT = 'その番組を視聴した受信機の台数',
     program_viewing.program_reach_households AS COUNT(DISTINCT program_viewing.IP_ADDRESS)
-      WITH SYNONYMS = ('番組視聴世帯数')
-      COMMENT = 'その番組を視聴した世帯の数',
+      WITH SYNONYMS = ('番組視聴IP数', '番組の世帯到達の代理指標')
+      COMMENT = 'その番組を視聴したIPアドレスの数。世帯数そのものではない',
     program_viewing.estimated_viewers AS ROUND(COUNT(DISTINCT program_viewing.IP_ADDRESS) * 2.2, 1)
       WITH SYNONYMS = ('推計視聴人数', '視聴人数')
-      COMMENT = '視聴世帯数に 1 世帯あたりの想定人数 2.2 を掛けた便宜的な値。世帯人数のデータがないため固定の係数を使っている',
+      COMMENT = '視聴IP数に1回線あたりの想定人数2.2を掛けた参考値。IP数は世帯数そのものではない',
     program_viewing.program_total_minutes AS SUM(program_viewing.program_minutes)
       WITH SYNONYMS = ('番組の総視聴時間')
       COMMENT = 'その番組が視聴された分数の合計',
@@ -191,13 +194,13 @@ CREATE OR REPLACE SEMANTIC VIEW SV_BROADCAST_VIEWING
       WITH SYNONYMS = ('フリークエンシー', '平均接触回数', '同じ人に何回見せたか')
       COMMENT = '接触した 1 台あたりの平均接触回数。分母は接触した台数であり、全台数ではない',
 
-    -- チャンネル移動の指標
+    -- 次に見た別チャンネルの指標
     zapping.transitions AS SUM(zapping.TRANSITION_COUNT)
-      WITH SYNONYMS = ('チャンネル移動回数', 'ザッピング回数')
-      COMMENT = 'チャンネルを移動した回数の合計'
+      WITH SYNONYMS = ('30分以内に次に見た別チャンネルの回数', 'チャンネル遷移回数')
+      COMMENT = '視聴終了から30分以内に別チャンネルを見始めた回数の合計'
   )
 
-  COMMENT = '地上波 5 局の非特定視聴データにもとづく視聴指標。リーチ、フリークエンシー、インプレッション、番組別の視聴実績、チャンネル移動を扱う'
+  COMMENT = '地上波5局の非特定視聴データにもとづく視聴指標。リーチ、フリークエンシー、インプレッション、番組別視聴、30分以内に次に見た別チャンネルを扱う'
 
   AI_SQL_GENERATION '数値は小数第 1 位までに丸めてください。日付の範囲が指定されていない場合は 2026 年 5 月 1 日から 7 月 31 日までの全期間を対象にしてください。セグメントを使った集計を返すときは、パネル調査で属性が判明している端末が全体の 10 パーセントであり、全体の姿ではないことを回答に添えてください。コマーシャルへの接触を含む集計を返すときは、放送の接触が視聴区間とスポットの放送時刻の重なりによる推定値であることを回答に添えてください。';
 
@@ -225,8 +228,8 @@ SELECT
     NULL::VARCHAR(20)                       AS CATEGORY,
     -- 検索の対象になる本文。題名やジャンルも本文に含めておくと
     -- 「アニメ」のような語でも当たりやすくなる
-    p.PROGRAM_NAME || '。' || p.GENRE || 'の番組。放送は' || n.NETWORK_NAME
-      || 'の' || p.TIME_SLOT || '帯、' || p.DURATION_MIN || '分。' || p.SYNOPSIS AS CONTENT
+    p.PROGRAM_NAME || '。' || p.GENRE || 'の番組。主な放送枠は' || n.NETWORK_NAME
+      || 'の' || p.TIME_SLOT || '帯、標準' || p.DURATION_MIN || '分。' || p.SYNOPSIS AS CONTENT
 FROM BCAST_VIEWING_HANDSON.RAW.PROGRAM_MASTER p
 JOIN BCAST_VIEWING_HANDSON.RAW.NETWORK_MASTER n
   ON p.NETWORK_ID = n.NETWORK_ID
@@ -244,7 +247,8 @@ SELECT
     c.CATEGORY                              AS CATEGORY,
     c.ADVERTISER || 'の' || c.CATEGORY || 'のコマーシャル。'
       || c.DURATION_SEC || '秒。' || c.CREATIVE_DESC AS CONTENT
-FROM BCAST_VIEWING_HANDSON.RAW.CM_MASTER c;
+FROM BCAST_VIEWING_HANDSON.RAW.CM_MASTER c
+WHERE c.IS_ANALYSIS_TARGET;
 
 -- 検索サービスを作る。
 -- ON に本文の列、ATTRIBUTES に絞り込みに使える列を指定します。

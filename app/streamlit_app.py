@@ -1,10 +1,10 @@
 """放送視聴データの可視化アプリ
 
-Snowsight の Projects、Streamlit から新規作成し、このファイルの内容を貼り付けて実行します。
-ローカルへのインストールやコマンドライン操作は必要ありません。
+Git リポジトリから内部ステージへ配置し、CREATE STREAMLIT で実行します。
+コードを画面へ貼り付けたり、ローカルへインストールしたりする必要はありません。
 
-参照するのはマート層だけです。指標の定義はセマンティックビューに置いてあるので、
-このアプリが持っているのは「どう見せるか」だけになります。
+参照するのはマート層だけです。セマンティックビューと同じ指標式を SQL に使い、
+画面表示用の集計を行います。
 """
 
 import altair as alt
@@ -95,16 +95,16 @@ summary = run(f"""
 
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("リーチ（台数）", f"{int(summary['REACH_DEVICES']):,}")
-c2.metric("リーチ（世帯数）", f"{int(summary['REACH_HOUSEHOLDS']):,}")
+c2.metric("リーチ（IP数）", f"{int(summary['REACH_HOUSEHOLDS']):,}")
 c3.metric("視聴回数", f"{int(summary['SESSIONS']):,}")
 c4.metric("総視聴時間（分）", f"{int(summary['MINUTES']):,}")
 
 st.info(
-    "台数と世帯数が違うのは、1 つの回線に複数の受信機がぶら下がっていることがあるためです。"
-    "世帯の代わりに IP アドレスを使うと、その分がまとめて 1 つとして数えられます。"
+    "台数とIP数が違うのは、同じIPアドレスを複数の受信機が共有することがあるためです。"
+    "IP数は世帯数そのものではなく、世帯到達の代理指標です。"
 )
 
-tab1, tab2, tab3, tab4 = st.tabs(["リーチの推移", "番組", "チャンネル移動", "フリークエンシー"])
+tab1, tab2, tab3, tab4 = st.tabs(["リーチの推移", "番組", "次に見た別の局", "フリークエンシー"])
 
 # -----------------------------------------------------------------------------
 # リーチの推移
@@ -199,8 +199,8 @@ with tab2:
     st.altair_chart(styled(chart), use_container_width=True)
 
     st.caption(
-        "推計視聴人数は視聴世帯数に 1 世帯あたりの想定人数 2.2 を掛けた便宜的な値です。"
-        "このデータには世帯の人数が入っていないため、固定の係数を使っています。"
+        "推計視聴人数は視聴IP数に1回線あたりの想定人数2.2を掛けた参考値です。"
+        "IP数は世帯数そのものではないため、正確な視聴人数ではありません。"
     )
 
     st.subheader("属性が分かっている範囲での傾向")
@@ -238,11 +238,11 @@ with tab2:
         st.dataframe(programs, use_container_width=True)
 
 # -----------------------------------------------------------------------------
-# チャンネル移動
+# 次に見た別の局
 # -----------------------------------------------------------------------------
 with tab3:
     st.markdown(
-        "局をまたいだチャンネル移動です。この数字は 1 局のデータだけでは出せません。"
+        "ある局の視聴後、30分以内に次に見た別の局です。この数字は 1 局のデータだけでは出せません。"
         "各局は自局が見られている間のログしか取得できないので、"
         "5 局分を共通 ID で束ねたあとで初めて分かります。"
     )
@@ -254,6 +254,8 @@ with tab3:
           SUM(TRANSITION_COUNT) AS TRANSITIONS
         FROM {MART}.MART_ZAPPING_TRANSITION
         WHERE VIEW_DATE BETWEEN '{date_from}' AND '{date_to}'
+          AND FROM_NETWORK_NAME IN ({network_filter})
+          AND TO_NETWORK_NAME IN ({network_filter})
         GROUP BY FROM_NETWORK_NAME, TO_NETWORK_NAME
         ORDER BY TRANSITIONS DESC
     """)
@@ -268,7 +270,7 @@ with tab3:
                             scale=alt.Scale(scheme="blues")),
             tooltip=["FROM_NETWORK_NAME:N", "TO_NETWORK_NAME:N", "TRANSITIONS:Q"],
         )
-        .properties(height=340, title="局から局へのチャンネル移動")
+        .properties(height=340, title="30分以内に次に見た別の局")
     )
     st.altair_chart(styled(chart), use_container_width=True)
 
@@ -279,6 +281,10 @@ with tab3:
 # フリークエンシー
 # -----------------------------------------------------------------------------
 with tab4:
+    st.caption(
+        "このタブはキャンペーン全期間・全局の集計です。"
+        "上の期間・局フィルターは、キャンペーン単位に集約済みのため適用されません。"
+    )
     st.markdown(
         "同じ受信機に何回コマーシャルが当たったかです。"
         "**リーチ × 平均フリークエンシー = インプレッション** の関係にあり、"
@@ -357,5 +363,5 @@ with tab4:
 st.markdown("---")
 st.caption(
     "指標の定義はセマンティックビュー BCAST_VIEWING_HANDSON.MART.SV_BROADCAST_VIEWING に"
-    "置いてあります。このアプリとエージェントは同じ定義を参照しています。"
+    "置いてあります。このアプリの SQL も同じ計算式に揃えています。"
 )

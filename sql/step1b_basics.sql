@@ -216,21 +216,27 @@ SELECT COUNT(*) AS "復元後の行数" FROM VIEWING_LOG_NW01;
 -- 4-1 事故を起こします。WHERE を付け忘れた想定で、全行消します。
 DELETE FROM VIEWING_LOG_NW01;
 
+-- 事故を起こした DELETE のクエリ ID を保存します。
+-- この ID を使えば、経過時間に関係なく事故の直前を指定できます。
+SET destructive_query_id = (SELECT LAST_QUERY_ID());
+
 SELECT COUNT(*) AS "事故後の行数" FROM VIEWING_LOG_NW01;
 
--- 4-2 5 分前の状態を読みます。テーブル名のうしろに AT を付けるだけです。
-SELECT COUNT(*) AS "5分前の行数"
-FROM VIEWING_LOG_NW01 AT(OFFSET => -300);
+-- 4-2 DELETE の直前の状態を読みます。
+SELECT COUNT(*) AS "事故直前の行数"
+FROM VIEWING_LOG_NW01 BEFORE(STATEMENT => $destructive_query_id);
 
--- 4-3 5 分前の状態で書き戻します
+-- 4-3 DELETE の直前の状態で書き戻します
 INSERT INTO VIEWING_LOG_NW01
-SELECT * FROM VIEWING_LOG_NW01 AT(OFFSET => -300);
+SELECT * FROM VIEWING_LOG_NW01 BEFORE(STATEMENT => $destructive_query_id);
 
 SELECT COUNT(*) AS "復旧後の行数" FROM VIEWING_LOG_NW01;
 
 -- 押さえておきたいこと
---   OFFSET は秒数です。時刻で指定する AT(TIMESTAMP => ...) や、
---   「あのクエリの直前」を指す BEFORE(STATEMENT => 'クエリID') も使えます。
+--   今回は「あのクエリの直前」を指す BEFORE(STATEMENT => 'クエリID') を
+--   使っています。経過時間に依存しないため、作成直後のテーブルでも安全です。
+--   ほかに、秒数で指定する AT(OFFSET => ...) や、時刻で指定する
+--   AT(TIMESTAMP => ...) も使えます。
 --   壊した本人が、他の人に頼まず、SELECT 文の書き方だけで復旧できます。
 
 
