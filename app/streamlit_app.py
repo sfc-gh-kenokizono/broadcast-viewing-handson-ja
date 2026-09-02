@@ -135,12 +135,6 @@ with tab1:
     )
     st.altair_chart(styled(chart), use_container_width=True)
 
-    st.markdown(
-        "第三放送ネットワークの 7 月 17 日が落ち込んでいます。"
-        "視聴が減ったのではなく、その日のログが届かなかったためです。"
-        "5 つの局からデータを集める仕組みでは、どこか 1 局が遅れたり落ちたりすることが必ず起こります。"
-    )
-
     st.subheader("エリア別のリーチ")
     area = run(f"""
         SELECT POSTAL_AREA, COUNT(DISTINCT COMMON_ID) AS REACH_DEVICES

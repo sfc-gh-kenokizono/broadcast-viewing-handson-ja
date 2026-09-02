@@ -11,7 +11,7 @@ sources:
       - name: VIEWING_LOG_NW02
         description: 第二放送ネットワークから届いた非特定視聴データ
       - name: VIEWING_LOG_NW03
-        description: 第三放送ネットワークから届いた非特定視聴データ。7 月 17 日のログが欠落している
+        description: 第三放送ネットワークから届いた非特定視聴データ
       - name: VIEWING_LOG_NW04
         description: 第四放送ネットワークから届いた非特定視聴データ
       - name: VIEWING_LOG_NW05

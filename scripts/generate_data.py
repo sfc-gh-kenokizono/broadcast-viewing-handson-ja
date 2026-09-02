@@ -19,7 +19,7 @@ Git リポジトリステージ経由で COPY INTO する。
   - 属性は 10 パーセントの端末にしか存在しない。世帯人数も個人属性も視聴ログには入れない。
   - 視聴は番組の放送枠に紐づけて発生させる。そうしないと番組別の集計が意味を持たない。
   - 端末の嗜好は「強すぎない」ようにする。作られたデータに見えないための調整。
-  - クレンジングの章が空回りしないよう、異常値と欠落を意図的に混ぜる。
+  - クレンジングの章が空回りしないよう、少数の異常値を意図的に混ぜる。
   - 番組表は各局 4 時から 24 時まで切れ目なく編成する。
   - コマーシャルは 20 分ごとの 3 分ブレークに、6 / 15 / 30 秒素材を並べる。
     CM_SPOT は局全体の在庫、AI 分析は IS_ANALYSIS_TARGET が TRUE の 20 素材に絞る。
@@ -43,9 +43,6 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 PERIOD_START = date(2026, 5, 1)
 PERIOD_END = date(2026, 7, 31)
 PERIOD_DAYS = (PERIOD_END - PERIOD_START).days      # 期間の日数 - 1（randint の上限に使う）
-MISSING_DAY = date(2026, 7, 17)      # NW03 のログが届かなかった日
-MISSING_NETWORK = "NW03"
-
 NETWORKS = [
     ("NW01", "第一放送ネットワーク", "041"),
     ("NW02", "第二放送ネットワーク", "051"),
@@ -376,8 +373,7 @@ def build_programs(rng: random.Random):
             "synopsis": synopsis,
             # 曜日は局ごとに 0 から 6 をすべて埋める。
             # idx % 7 にすると局と曜日の組み合わせに穴ができ、
-            # 「ある局のある曜日には番組がない」＝その日の行が 0 件になる。
-            # 意図した欠落（NW03 の 1 日）と区別できなくなるので、
+            # 「ある局のある曜日には番組がない」＝その日の行が 0 件になるため、
             # 局のなかで曜日を順に割り当てる。
             "day_of_week": (idx // len(NETWORKS)) % 7,
         })
@@ -495,18 +491,15 @@ def build_viewing_logs(rng: random.Random, devices, schedule, total_rows: int):
 
     for network_id, slots in sched_by_network.items():
         per_network = int(total_rows * NETWORK_SHARE[network_id])
-        # この局に届かない日の枠は最初から除いておく
-        usable = [s for s in slots
-                  if not (network_id == MISSING_NETWORK and s["air_date"] == MISSING_DAY)]
         # 時間帯の重みに、日付のトレンド（放送は微減）を掛けておく
         slot_weights = [TIME_SLOTS[s["time_slot"]]["weight"]
                         * date_trend(s["air_date"], 1.12, 0.88)
-                        for s in usable]
+                        for s in slots]
         rows = []
         # rng.choices は C 実装で、まとめて引くと 1 件ずつ選ぶより桁違いに速い
         batch = 20000
         while len(rows) < per_network:
-            picked_slots = rng.choices(usable, weights=slot_weights, k=batch)
+            picked_slots = rng.choices(slots, weights=slot_weights, k=batch)
             picked_devs = rng.choices(devices, weights=device_weights, k=batch)
             picked_durations = rng.choices(duration_values, weights=duration_weights, k=batch)
             for slot, dev, duration in zip(picked_slots, picked_devs, picked_durations):
@@ -758,7 +751,6 @@ def main():
     print(f"\n視聴区間の合計: {total_viewing:,} 行")
     print(f"混ぜた異常値: 終了が開始より前 {anomaly_counts['reversed']} 件 / "
           f"24 時間超 {anomaly_counts['too_long']} 件 / 重複 {anomaly_counts['duplicated']} 件")
-    print(f"{MISSING_NETWORK} の {MISSING_DAY} のログは意図的に欠落させています。")
 
 
 if __name__ == "__main__":

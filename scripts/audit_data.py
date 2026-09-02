@@ -18,6 +18,7 @@ CHANNEL_BY_NETWORK = {
 }
 EXPECTED_RAW_VIEWING_ROWS = 1_050_648
 EXPECTED_CLEAN_VIEWING_ROWS = 1_050_000
+EXPECTED_MINUTE_ROWS = 12_075_722
 
 
 def read_csv(name: str):
@@ -106,12 +107,14 @@ def main():
 
     viewing_rows = 0
     view_starts_by_hour = Counter()
+    viewing_by_day_network = Counter()
     clean_intervals_by_device = defaultdict(list)
     seen_rows = set()
     reversed_rows = 0
     too_long_rows = 0
     duplicate_rows = 0
     clean_rows = 0
+    minute_rows = 0
     for network_id in sorted(NETWORK_IDS):
         rows = read_csv(f"viewing_log_{network_id.lower()}")
         viewing_rows += len(rows)
@@ -139,6 +142,17 @@ def main():
                 fail(f"期間外の正常な視聴区間があります: {row_key}")
             if start.hour < 4 or end > datetime.combine(start.date(), datetime.min.time()) + timedelta(hours=24):
                 fail(f"放送時間外の正常な視聴区間があります: {row_key}")
+            minute_rows += max(
+                1,
+                int(
+                    (
+                        end.replace(second=0, microsecond=0)
+                        - start.replace(second=0, microsecond=0)
+                    ).total_seconds()
+                    // 60
+                ),
+            )
+            viewing_by_day_network[(start.date(), row["NETWORK_ID"])] += 1
             clean_intervals_by_device[row["COMMON_ID"]].append(
                 (start, end, row["NETWORK_ID"])
             )
@@ -151,12 +165,11 @@ def main():
             f"clean={clean_rows:,}, reversed={reversed_rows}, too_long={too_long_rows}, duplicate={duplicate_rows}"
         )
 
-    missing_rows = [
-        interval for intervals in clean_intervals_by_device.values() for interval in intervals
-        if interval[2] == "NW03" and interval[0].date() == date(2026, 7, 17)
-    ]
-    if missing_rows:
-        fail("意図したNW03の欠損日に正常な視聴ログがあります")
+    if set(viewing_by_day_network) != expected_keys:
+        missing_keys = sorted(expected_keys - set(viewing_by_day_network))
+        fail(f"視聴ログの日・局に不足があります: {missing_keys}")
+    if minute_rows != EXPECTED_MINUTE_ROWS:
+        fail(f"1分単位への分解後の行数が想定外です: {minute_rows:,}")
 
     for common_id, intervals in clean_intervals_by_device.items():
         intervals.sort()
@@ -173,6 +186,8 @@ def main():
     print(f"CM素材: {len(creatives):,}（分析対象 20）")
     print(f"CM放送実績: {len(spots):,}（1局1日 {len(spots) / days / len(NETWORK_IDS):.1f} 本）")
     print(f"視聴区間: {viewing_rows:,}")
+    print("視聴ログの日・局の組み合わせ: 全日・全局あり")
+    print(f"1分単位への分解後: {minute_rows:,}")
     print("正常化後の同一TV内の時間重複: 0")
     print(f"正常 {clean_rows:,} / 逆転 {reversed_rows} / 24時間超 {too_long_rows} / 重複 {duplicate_rows}")
     print("CM開始時刻（時間別）:", dict(sorted(starts_by_hour.items())))
