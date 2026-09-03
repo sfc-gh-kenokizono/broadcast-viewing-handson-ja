@@ -2,12 +2,13 @@
 -- 第 1b 章  Snowflake そのものの動きを体感する（補足）
 -- =============================================================================
 -- 実行するロール: ACCOUNTADMIN
--- 所要時間の目安: 12 分
+-- 所要時間の目安: 15 分
 --
 -- この章の位置づけ
 --   第 2 章から先は「放送視聴データをどう作るか」という中身の話に入ります。
---   その前に、Snowflake という土台そのものが持っている動きを 4 つだけ
+--   その前に、Snowflake という土台そのものが持っている動きを 5 つだけ
 --   手で触っておきます。中身の話に入ってからでは立ち止まりにくいためです。
+--   最後に補足として、届く前のデータがどう畳まれているかも小さく確かめます。
 --
 -- この章でやること
 --   1. ウェアハウスの大きさを変えて、同じクエリの時間がどう変わるか見る
@@ -15,6 +16,7 @@
 --   3. テーブルを消してしまってから、元に戻す（UNDROP）
 --   4. 消していないが中身を壊してしまった場合に、過去の状態を読む（Time Travel）
 --   5. 大きなテーブルをコピーせずに複製する（ゼロコピークローン）
+--   6. （補足）60 秒ごとの信号を from-to の 1 行に畳む
 --
 -- 前提
 --   第 1 章を実行し終わっていること。RAW スキーマに視聴ログが入っている状態です。
@@ -34,10 +36,10 @@ USE SCHEMA BCAST_VIEWING_HANDSON.RAW;
 -- ここが従来のデータベースと最も違う点です。
 --
 -- 何を実行するか
---   視聴区間を 1 分単位に分解しながら、毎分・局ごとの視聴受信機数を数えます。
---   105 万行の視聴区間が約 1,208 万行に膨らみ、そこから重複しない受信機を
+--   視聴区間を 10 秒単位に分解してから、局別・1 時間帯別の視聴受信機数を数えます。
+--   105 万行の視聴区間が約 7,200 万行に膨らみ、そこから重複しない受信機を
 --   数えるので、それなりに計算量のあるクエリです。
---   （この分解は第 2 章で dbt が作るものと同じ考え方です。先取りになります）
+--   （第 2 章の dbt では、同じ考え方で 1 分単位に分解します）
 --
 -- 手順
 --   1-1 を XSMALL で実行して、右下に出る実行時間を書き留めます
@@ -51,26 +53,57 @@ ALTER WAREHOUSE BCAST_HANDSON_WH SET WAREHOUSE_SIZE = 'XSMALL';
 -- これがないと、LARGE のクエリが前回結果を返し、正しい比較になりません。
 ALTER SESSION SET USE_CACHED_RESULT = FALSE;
 
+-- このクエリがしていること
+--
+--   元の視聴ログ
+--     C000123 / NW01 / 20:00 から 20:12 まで視聴
+--
+--             10 秒単位に展開
+--                    ↓
+--     C000123 / NW01 / 20:00
+--     C000123 / NW01 / 20:00:10
+--     C000123 / NW01 / 20:00:20
+--                  ...
+--     C000123 / NW01 / 20:11:50
+--
+--             局と 1 時間ごとに集計
+--                    ↓
+--     NW01 / 20:00 台 / 視聴受信機数 8,123 台
+--
+-- 最終的には、視聴受信機数が多い「局 × 1 時間」の上位 20 件を表示します。
+-- この結果自体を後段で使うのではなく、同じ計算を XSMALL と LARGE で実行し、
+-- ウェアハウスの大きさによる処理時間の違いを体験するためのクエリです。
+
 WITH logs AS (
+  -- 5 局に分かれている視聴ログを、1 つの縦長のデータにまとめます。
+  -- UNION ALL は重複を消さずに全行をそのまま連結します。
   SELECT NETWORK_ID, COMMON_ID, VIEW_FROM, VIEW_TO FROM VIEWING_LOG_NW01
   UNION ALL SELECT NETWORK_ID, COMMON_ID, VIEW_FROM, VIEW_TO FROM VIEWING_LOG_NW02
   UNION ALL SELECT NETWORK_ID, COMMON_ID, VIEW_FROM, VIEW_TO FROM VIEWING_LOG_NW03
   UNION ALL SELECT NETWORK_ID, COMMON_ID, VIEW_FROM, VIEW_TO FROM VIEWING_LOG_NW04
   UNION ALL SELECT NETWORK_ID, COMMON_ID, VIEW_FROM, VIEW_TO FROM VIEWING_LOG_NW05
 ),
-minute_numbers AS (
-  SELECT ROW_NUMBER() OVER (ORDER BY SEQ4()) - 1 AS MINUTE_OFFSET
-  FROM TABLE(GENERATOR(ROWCOUNT => 1441))
+interval_numbers AS (
+  -- 視聴区間を10秒単位へ展開するため、8,641個の連番を用意します。
+  -- 24時間の正常行では、このうち0から8,639までを使います。
+  SELECT ROW_NUMBER() OVER (ORDER BY SEQ4()) - 1 AS INTERVAL_OFFSET
+  FROM TABLE(GENERATOR(ROWCOUNT => 8641))
 )
 SELECT
   l.NETWORK_ID                                                    AS "局",
-  DATE_TRUNC('hour', DATEADD('minute', n.MINUTE_OFFSET, l.VIEW_FROM)) AS "時間帯",
+  -- 10秒単位に展開した時刻を、20:00、21:00のような1時間単位にまとめます。
+  DATE_TRUNC('hour', DATEADD('second', n.INTERVAL_OFFSET * 10, l.VIEW_FROM)) AS "時間帯",
+  -- 同じ受信機を何分見ていても、この局・時間帯では1台として数えます。
   COUNT(DISTINCT l.COMMON_ID)                                     AS "視聴受信機数"
 FROM logs l
-INNER JOIN minute_numbers n
-  ON n.MINUTE_OFFSET < GREATEST(1, DATEDIFF('minute', l.VIEW_FROM, l.VIEW_TO))
+INNER JOIN interval_numbers n
+  -- 12分間の視聴なら、0から71までの72個の番号と結合して72行に展開します。
+  ON n.INTERVAL_OFFSET < GREATEST(1, CEIL(DATEDIFF('second', l.VIEW_FROM, l.VIEW_TO) / 10.0))
+-- 終了が開始以前になっている異常行は、この比較用集計から除外します。
 WHERE l.VIEW_TO > l.VIEW_FROM
+  AND DATEDIFF('second', l.VIEW_FROM, l.VIEW_TO) <= 86400
 GROUP BY 1, 2
+-- 視聴受信機数が多い時間帯から並べ、結果を見やすい20件に絞ります。
 ORDER BY "視聴受信機数" DESC
 LIMIT 20;
 
@@ -99,18 +132,19 @@ WITH logs AS (
   UNION ALL SELECT NETWORK_ID, COMMON_ID, VIEW_FROM, VIEW_TO FROM VIEWING_LOG_NW04
   UNION ALL SELECT NETWORK_ID, COMMON_ID, VIEW_FROM, VIEW_TO FROM VIEWING_LOG_NW05
 ),
-minute_numbers AS (
-  SELECT ROW_NUMBER() OVER (ORDER BY SEQ4()) - 1 AS MINUTE_OFFSET
-  FROM TABLE(GENERATOR(ROWCOUNT => 1441))
+interval_numbers AS (
+  SELECT ROW_NUMBER() OVER (ORDER BY SEQ4()) - 1 AS INTERVAL_OFFSET
+  FROM TABLE(GENERATOR(ROWCOUNT => 8641))
 )
 SELECT
   l.NETWORK_ID                                                    AS "局",
-  DATE_TRUNC('hour', DATEADD('minute', n.MINUTE_OFFSET, l.VIEW_FROM)) AS "時間帯",
+  DATE_TRUNC('hour', DATEADD('second', n.INTERVAL_OFFSET * 10, l.VIEW_FROM)) AS "時間帯",
   COUNT(DISTINCT l.COMMON_ID)                                     AS "視聴受信機数"
 FROM logs l
-INNER JOIN minute_numbers n
-  ON n.MINUTE_OFFSET < GREATEST(1, DATEDIFF('minute', l.VIEW_FROM, l.VIEW_TO))
+INNER JOIN interval_numbers n
+  ON n.INTERVAL_OFFSET < GREATEST(1, CEIL(DATEDIFF('second', l.VIEW_FROM, l.VIEW_TO) / 10.0))
 WHERE l.VIEW_TO > l.VIEW_FROM
+  AND DATEDIFF('second', l.VIEW_FROM, l.VIEW_TO) <= 86400
 GROUP BY 1, 2
 ORDER BY "視聴受信機数" DESC
 LIMIT 20;
@@ -124,11 +158,11 @@ LIMIT 20;
 -- =============================================================================
 -- 2. 結果キャッシュ
 -- =============================================================================
--- 3 度目です。文字が 1 文字も違わない同じクエリを、もう一度実行します。
-
 -- ここから結果キャッシュを使う設定に戻します。
 ALTER SESSION SET USE_CACHED_RESULT = TRUE;
 
+-- 2-1 まず1回実行し、再利用できる結果を作ります。
+-- 設定をTRUEにしただけでは、まだこのクエリの結果は作られていません。
 WITH logs AS (
   SELECT NETWORK_ID, COMMON_ID, VIEW_FROM, VIEW_TO FROM VIEWING_LOG_NW01
   UNION ALL SELECT NETWORK_ID, COMMON_ID, VIEW_FROM, VIEW_TO FROM VIEWING_LOG_NW02
@@ -136,23 +170,50 @@ WITH logs AS (
   UNION ALL SELECT NETWORK_ID, COMMON_ID, VIEW_FROM, VIEW_TO FROM VIEWING_LOG_NW04
   UNION ALL SELECT NETWORK_ID, COMMON_ID, VIEW_FROM, VIEW_TO FROM VIEWING_LOG_NW05
 ),
-minute_numbers AS (
-  SELECT ROW_NUMBER() OVER (ORDER BY SEQ4()) - 1 AS MINUTE_OFFSET
-  FROM TABLE(GENERATOR(ROWCOUNT => 1441))
+interval_numbers AS (
+  SELECT ROW_NUMBER() OVER (ORDER BY SEQ4()) - 1 AS INTERVAL_OFFSET
+  FROM TABLE(GENERATOR(ROWCOUNT => 8641))
 )
 SELECT
   l.NETWORK_ID                                                    AS "局",
-  DATE_TRUNC('hour', DATEADD('minute', n.MINUTE_OFFSET, l.VIEW_FROM)) AS "時間帯",
+  DATE_TRUNC('hour', DATEADD('second', n.INTERVAL_OFFSET * 10, l.VIEW_FROM)) AS "時間帯",
   COUNT(DISTINCT l.COMMON_ID)                                     AS "視聴受信機数"
 FROM logs l
-INNER JOIN minute_numbers n
-  ON n.MINUTE_OFFSET < GREATEST(1, DATEDIFF('minute', l.VIEW_FROM, l.VIEW_TO))
+INNER JOIN interval_numbers n
+  ON n.INTERVAL_OFFSET < GREATEST(1, CEIL(DATEDIFF('second', l.VIEW_FROM, l.VIEW_TO) / 10.0))
 WHERE l.VIEW_TO > l.VIEW_FROM
+  AND DATEDIFF('second', l.VIEW_FROM, l.VIEW_TO) <= 86400
 GROUP BY 1, 2
 ORDER BY "視聴受信機数" DESC
 LIMIT 20;
 
--- ほぼ 0 秒で返ります。ウェアハウスは 1 秒も動いていません。
+-- 2-2 上のWITHからLIMITまでを、もう1回そのまま実行します。
+-- 2回目は保存された結果を再利用するため、ほぼ0秒で返ります。
+WITH logs AS (
+  SELECT NETWORK_ID, COMMON_ID, VIEW_FROM, VIEW_TO FROM VIEWING_LOG_NW01
+  UNION ALL SELECT NETWORK_ID, COMMON_ID, VIEW_FROM, VIEW_TO FROM VIEWING_LOG_NW02
+  UNION ALL SELECT NETWORK_ID, COMMON_ID, VIEW_FROM, VIEW_TO FROM VIEWING_LOG_NW03
+  UNION ALL SELECT NETWORK_ID, COMMON_ID, VIEW_FROM, VIEW_TO FROM VIEWING_LOG_NW04
+  UNION ALL SELECT NETWORK_ID, COMMON_ID, VIEW_FROM, VIEW_TO FROM VIEWING_LOG_NW05
+),
+interval_numbers AS (
+  SELECT ROW_NUMBER() OVER (ORDER BY SEQ4()) - 1 AS INTERVAL_OFFSET
+  FROM TABLE(GENERATOR(ROWCOUNT => 8641))
+)
+SELECT
+  l.NETWORK_ID                                                    AS "局",
+  DATE_TRUNC('hour', DATEADD('second', n.INTERVAL_OFFSET * 10, l.VIEW_FROM)) AS "時間帯",
+  COUNT(DISTINCT l.COMMON_ID)                                     AS "視聴受信機数"
+FROM logs l
+INNER JOIN interval_numbers n
+  ON n.INTERVAL_OFFSET < GREATEST(1, CEIL(DATEDIFF('second', l.VIEW_FROM, l.VIEW_TO) / 10.0))
+WHERE l.VIEW_TO > l.VIEW_FROM
+  AND DATEDIFF('second', l.VIEW_FROM, l.VIEW_TO) <= 86400
+GROUP BY 1, 2
+ORDER BY "視聴受信機数" DESC
+LIMIT 20;
+
+-- 2-2はほぼ0秒で返ります。ウェアハウスは計算していません。
 --
 -- なぜそうなるのか
 --   同じクエリで、参照しているテーブルが 1 行も変わっていない場合、
@@ -256,9 +317,13 @@ SELECT
   (SELECT COUNT(*) FROM VIEWING_LOG_NW01_DEV) AS "複製";
 
 -- 5-3 複製の側だけを書き換えます
+-- NW01の本来のCHANNEL_CODEは、地上波のチャンネルコードを表す「041」です。
+-- 「999」は実在のチャンネルではなく、複製だけを変えたことが分かるようにするテスト値です。
 UPDATE VIEWING_LOG_NW01_DEV SET CHANNEL_CODE = '999';
 
 -- 5-4 本番が変わっていないことを確認します
+-- 結果が「本番=041 / 複製=999」なら、複製へのUPDATEが本番に影響していません。
+-- MINを使うのは、全行が同じチャンネルコードなので代表値を1つ表示するためです。
 SELECT
   (SELECT MIN(CHANNEL_CODE) FROM VIEWING_LOG_NW01)     AS "本番のチャンネル値",
   (SELECT MIN(CHANNEL_CODE) FROM VIEWING_LOG_NW01_DEV) AS "複製のチャンネル値";
@@ -277,6 +342,89 @@ DROP TABLE VIEWING_LOG_NW01_DEV;
 
 
 -- =============================================================================
+-- 6. （補足）60 秒ごとの信号を from-to の 1 行に畳む
+-- =============================================================================
+-- この章の 1 では、from-to の 1 行を 10 秒ごとの行に「展開」しました。
+-- ここでは逆向きに、受信機が送ってくる細かい信号を from-to に「畳む」処理を、
+-- 1 台分の小さなサンプルで試します。RAW のテーブルには触りません。
+--
+-- 受信機は視聴中、60 秒ごとに「いま NW01 を見ている」という信号を送ります。
+-- 局側ではこれを次の 2 つのルールで 1 つの区間にまとめてから基盤へ渡します。
+--
+--   ルール 1  チャンネルが変わったら、新しい区間
+--   ルール 2  前の信号から 60 秒より空いたら（TV を消した）、新しい区間
+--
+--   📡 60 秒ごとの信号（7 行）          📦 畳んだあと（3 行）
+--   20:00 NW01                          NW01  20:00 → 20:03
+--   20:01 NW01                          NW02  20:03 → 20:05
+--   20:02 NW01                          NW01  20:10 → 20:12
+--   20:03 NW02   ← ルール 1
+--   20:04 NW02
+--   20:10 NW01   ← ルール 2（5 分空いた）
+--   20:11 NW01
+--
+-- 情報は何も減っていません。行数だけが小さくなります。
+-- 第 1a 章で読み込んだ視聴ログは、この畳んだあとの形です。
+
+-- 6-1 サンプルの信号を作ります（受信機 1 台、20:00 から 20:12 までの一部）
+WITH signals AS (
+  SELECT COLUMN1::TIMESTAMP_NTZ AS SIGNAL_AT, COLUMN2 AS NETWORK_ID
+  FROM VALUES
+    ('2026-07-05 20:00:00', 'NW01'),
+    ('2026-07-05 20:01:00', 'NW01'),
+    ('2026-07-05 20:02:00', 'NW01'),
+    ('2026-07-05 20:03:00', 'NW02'),
+    ('2026-07-05 20:04:00', 'NW02'),
+    ('2026-07-05 20:10:00', 'NW01'),
+    ('2026-07-05 20:11:00', 'NW01')
+),
+
+-- 6-2 1 つ前の信号と比べて、「区間の始まり」かどうかを判定します
+flagged AS (
+  SELECT
+    SIGNAL_AT,
+    NETWORK_ID,
+    CASE
+      WHEN LAG(NETWORK_ID) OVER (ORDER BY SIGNAL_AT) IS DISTINCT FROM NETWORK_ID THEN 1  -- ルール 1
+      WHEN DATEDIFF('second', LAG(SIGNAL_AT) OVER (ORDER BY SIGNAL_AT), SIGNAL_AT) > 60 THEN 1  -- ルール 2
+      ELSE 0
+    END AS IS_NEW_INTERVAL
+  FROM signals
+),
+
+-- 6-3 「始まり」の数を累計して、区間ごとの番号を振ります
+numbered AS (
+  SELECT
+    SIGNAL_AT,
+    NETWORK_ID,
+    SUM(IS_NEW_INTERVAL) OVER (ORDER BY SIGNAL_AT ROWS UNBOUNDED PRECEDING) AS INTERVAL_NO
+  FROM flagged
+)
+
+-- 6-4 区間番号ごとにまとめて、from-to の 1 行にします
+-- VIEW_TO は最後の信号の 60 秒後です（最後の信号のあとも 60 秒は見ていたとみなす）
+SELECT
+  INTERVAL_NO                                   AS "区間",
+  NETWORK_ID                                    AS "局",
+  MIN(SIGNAL_AT)                                AS "VIEW_FROM",
+  DATEADD('second', 60, MAX(SIGNAL_AT))         AS "VIEW_TO",
+  COUNT(*)                                      AS "元の信号の行数"
+FROM numbered
+GROUP BY INTERVAL_NO, NETWORK_ID
+ORDER BY INTERVAL_NO;
+
+-- 押さえておきたいこと
+--   7 行が 3 行になりました。1 のクエリと合わせると、
+--
+--     60 秒ごとの信号  ──畳む──▶  from-to  ──展開──▶  10 秒 / 1 分ごとの行
+--
+--   という両方向を手で確かめたことになります。どの形でも中身の情報は同じで、
+--   変わるのは行数、つまり保存量と計算量だけです。
+--   ふだんは行数の少ない from-to のまま持ち、時間軸を細かく刻む指標が
+--   必要なときだけ展開する、という使い分けを第 2 章で見ていきます。
+
+
+-- =============================================================================
 -- この章のまとめ
 -- =============================================================================
 --   ウェアハウス      計算する機械。データと分かれているので、大きさを
@@ -286,6 +434,8 @@ DROP TABLE VIEWING_LOG_NW01_DEV;
 --   UNDROP            消したテーブルを 1 行で戻せる。
 --   Time Travel       消していないが壊した場合も、過去の時点を読める。
 --   クローン           大きなテーブルを一瞬で、容量を増やさず複製できる。
+--   （補足）畳む       60 秒ごとの信号は from-to に畳んで小さく持てる。
+--                     展開と畳みのどちらでも情報は変わらない。
 --
 -- これらはすべて、設定も準備もなく最初から効いています。
 -- 次の第 2 章から、この土台の上に放送視聴データの変換を作っていきます。

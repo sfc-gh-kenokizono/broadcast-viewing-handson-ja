@@ -104,7 +104,7 @@ st.info(
     "IP数は世帯数そのものではなく、世帯到達の代理指標です。"
 )
 
-tab1, tab2, tab3, tab4 = st.tabs(["リーチの推移", "番組", "次に見た別の局", "フリークエンシー"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["リーチの推移", "番組", "次に見た別の局", "フリークエンシー", "毎分の推移"])
 
 # -----------------------------------------------------------------------------
 # リーチの推移
@@ -353,6 +353,82 @@ with tab4:
 
     with st.expander("広告主ごとの一覧を表で見る"):
         st.dataframe(freq, use_container_width=True)
+
+# -----------------------------------------------------------------------------
+# 毎分の推移
+# -----------------------------------------------------------------------------
+with tab5:
+    st.markdown(
+        "1 日を 1 分刻みで並べた視聴台数です。"
+        "このグラフは from-to のままでは描けないという理由で、第 2 章で区間を 1 分ごとに展開しました。"
+        "展開した行をそのまま使うのではなく、「局 × 分 × 台数」に集計した MART_MINUTE_AUDIENCE を参照しています。"
+    )
+
+    mc1, mc2 = st.columns(2)
+    with mc1:
+        minute_date = st.date_input(
+            "日付", value=date_from, min_value=d_min, max_value=d_max, key="minute_date"
+        )
+    with mc2:
+        minute_network = st.selectbox("局", selected_networks, key="minute_network")
+
+    minutes = run(f"""
+        SELECT MINUTE_AT, VIEWING_DEVICES
+        FROM {MART}.MART_MINUTE_AUDIENCE
+        WHERE NETWORK_NAME = '{minute_network}'
+          AND VIEW_DATE = '{minute_date}'
+        ORDER BY MINUTE_AT
+    """)
+
+    programs_on_day = run(f"""
+        SELECT DISTINCT PROGRAM_NAME, PROGRAM_AIR_FROM, PROGRAM_AIR_TO
+        FROM {MART}.MART_PROGRAM_VIEWING
+        WHERE NETWORK_NAME = '{minute_network}'
+          AND AIR_DATE = '{minute_date}'
+        ORDER BY PROGRAM_AIR_FROM
+    """)
+
+    if minutes.empty:
+        st.info("この日・この局の視聴データはありません。")
+    else:
+        line = (
+            alt.Chart(minutes)
+            .mark_line(color=BLUE, strokeWidth=1.5)
+            .encode(
+                x=alt.X("MINUTE_AT:T", title="時刻", axis=alt.Axis(format="%H:%M")),
+                y=alt.Y("VIEWING_DEVICES:Q", title="視聴台数"),
+                tooltip=[alt.Tooltip("MINUTE_AT:T", title="時刻", format="%H:%M"),
+                         alt.Tooltip("VIEWING_DEVICES:Q", title="台数")],
+            )
+        )
+        layers = [line]
+        if not programs_on_day.empty:
+            rules = (
+                alt.Chart(programs_on_day)
+                .mark_rule(color=GREY, strokeDash=[4, 4])
+                .encode(
+                    x=alt.X("PROGRAM_AIR_FROM:T"),
+                    tooltip=[alt.Tooltip("PROGRAM_NAME:N", title="番組"),
+                             alt.Tooltip("PROGRAM_AIR_FROM:T", title="開始", format="%H:%M"),
+                             alt.Tooltip("PROGRAM_AIR_TO:T", title="終了", format="%H:%M")],
+                )
+            )
+            layers.append(rules)
+        chart = alt.layer(*layers).properties(
+            height=360,
+            title=f"{minute_network} {minute_date} の毎分の視聴台数（破線は番組の始まり）",
+        )
+        st.altair_chart(styled(chart), use_container_width=True)
+
+        peak = minutes.loc[minutes["VIEWING_DEVICES"].idxmax()]
+        st.caption(
+            f"この日のピークは {pd.Timestamp(peak['MINUTE_AT']).strftime('%H:%M')} の "
+            f"{int(peak['VIEWING_DEVICES']):,} 台です。番組の境で台数が動き、CM ブレークで少し凹む様子は、"
+            "この粒度でないと見えません。リーチのような「見たかどうか」の指標は from-to のままで十分です。"
+        )
+
+        with st.expander("この日の番組表を見る"):
+            st.dataframe(programs_on_day, use_container_width=True)
 
 st.markdown("---")
 st.caption(

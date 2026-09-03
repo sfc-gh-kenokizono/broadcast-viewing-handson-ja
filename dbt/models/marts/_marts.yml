@@ -52,3 +52,21 @@ models:
       - name: TRANSITION_COUNT
         tests:
           - not_null
+
+  - name: mart_minute_audience
+    description: |
+      局ごと、1 分ごとの視聴台数。1 分単位に展開した int_viewing_minutes を
+      「局 × 分」で数え、「誰が」を捨てて「何台」だけを残したもの。
+      約 1,208 万行が約 55 万行に縮む。毎分の視聴カーブを描くための唯一のマート。
+    columns:
+      - name: NETWORK_ID
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['NW01', 'NW02', 'NW03', 'NW04', 'NW05']
+      - name: MINUTE_AT
+        tests:
+          - not_null
+      - name: VIEWING_DEVICES
+        tests:
+          - not_null
