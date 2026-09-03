@@ -6,8 +6,12 @@
 --
 -- このスクリプトでやること
 --   1. マート層の上にセマンティックビューを作る（指標の定義を Snowflake 側に置く）
---   2. 番組とコマーシャルの説明文を検索できるようにする
+--   2. 番組とコマーシャルの説明文をひとつのビューにまとめる（検索の材料）
+--      → 検索サービスそのものは Snowsight の画面で作ります（docs/step3a_semantic.md）
 --   3. 集計データだけを見るロールに、両方を使う権限を渡す
+--
+-- 画面で作るのが間に合わない場合は、ファイル末尾の
+-- 「UI を使わず SQL で一気に作成する場合はこちら」を実行してください。
 --
 -- なぜセマンティックビューを作るのか
 --   「リーチ」「フリークエンシー」「インプレッション」が何を指すのかを、
@@ -205,11 +209,11 @@ CREATE OR REPLACE SEMANTIC VIEW SV_BROADCAST_VIEWING
   AI_SQL_GENERATION '数値は小数第 1 位までに丸めてください。日付の範囲が指定されていない場合は 2026 年 5 月 1 日から 7 月 31 日までの全期間を対象にしてください。セグメントを使った集計を返すときは、パネル調査で属性が判明している端末が全体の 10 パーセントであり、全体の姿ではないことを回答に添えてください。コマーシャルへの接触を含む集計を返すときは、放送の接触が視聴区間とスポットの放送時刻の重なりによる推定値であることを回答に添えてください。';
 
 -- =============================================================================
--- 2. 番組とコマーシャルの説明文を検索できるようにする
+-- 2. 番組とコマーシャルの説明文をひとつのビューにまとめる
 -- =============================================================================
 -- 視聴ログは数値と ID だけなので、文章として検索できる材料が別に必要です。
 -- 番組の概要文とコマーシャルの素材説明文をひとつのビューにまとめ、
--- それを検索サービスの対象にします。
+-- このあと Snowsight の画面で作る検索サービスの対象にします。
 --
 -- これがあると「若い人向けのバラエティ番組を教えて」のような、
 -- 数値では表せない質問に答えられるようになります。
@@ -250,18 +254,25 @@ SELECT
 FROM BCAST_VIEWING_HANDSON.RAW.CM_MASTER c
 WHERE c.IS_ANALYSIS_TARGET;
 
--- 検索サービスを作る。
--- ON に本文の列、ATTRIBUTES に絞り込みに使える列を指定します。
--- TARGET_LAG は元のデータが変わったときに、どれだけの遅れまで許すかです。
-CREATE OR REPLACE CORTEX SEARCH SERVICE SVC_PROGRAM_CM_META
-  ON CONTENT
-  ATTRIBUTES DOC_TYPE, DOC_ID, TITLE, GENRE, TIME_SLOT, NETWORK_NAME, ADVERTISER, CATEGORY
-  WAREHOUSE = BCAST_HANDSON_WH
-  TARGET_LAG = '1 hour'
-  COMMENT = '番組の概要文とコマーシャルの素材説明文の検索'
-  AS
-    SELECT DOC_TYPE, DOC_ID, TITLE, GENRE, TIME_SLOT, NETWORK_NAME, ADVERTISER, CATEGORY, CONTENT
-    FROM BCAST_VIEWING_HANDSON.MART.V_PROGRAM_CM_DOCS;
+-- ビューの中身を確認します。番組 60 件＋コマーシャル 20 件 = 80 行です。
+SELECT DOC_TYPE, COUNT(*) AS "件数" FROM V_PROGRAM_CM_DOCS GROUP BY DOC_TYPE;
+
+-- 【ここで画面操作】検索サービスを Snowsight で作ります
+-- ---------------------------------------------------------------------------
+--   左メニュー AI と ML → Cortex Search → 右上の 作成
+--   設定値は docs/step3a_semantic.md の「検索サービスを画面で作る」の表を見て入力します。
+--     サービス名        SVC_PROGRAM_CM_META
+--     対象              BCAST_VIEWING_HANDSON.MART.V_PROGRAM_CM_DOCS
+--     検索列            CONTENT
+--     属性列            DOC_TYPE, DOC_ID, TITLE, GENRE, TIME_SLOT, NETWORK_NAME, ADVERTISER, CATEGORY
+--     サービスに含む列  すべて
+--     ターゲットラグ    1 時間
+--     ウェアハウス      BCAST_HANDSON_WH
+--   作成後、下の 3 節に進む前に次でできたことを確認します。
+-- ---------------------------------------------------------------------------
+SHOW CORTEX SEARCH SERVICES IN SCHEMA BCAST_VIEWING_HANDSON.MART;
+
+-- 画面で作るのが間に合わない場合は、ファイル末尾の保険の SQL を実行してからここに戻ってください。
 
 -- =============================================================================
 -- 3. 集計データだけを見るロールに権限を渡す
@@ -347,3 +358,32 @@ SELECT PARSE_JSON(
 -- =============================================================================
 -- 第 3 章はここまでです。第 4 章（エージェント）は docs/step4_cowork.md へ。
 -- =============================================================================
+
+
+-- =============================================================================
+-- 保険：UI を使わず SQL で一気に作成する場合はこちら
+-- =============================================================================
+-- 画面での作成が間に合わないときや、もう一度作り直したいときに使います。
+-- 画面で入力する値と完全に同じ内容です。実行したあとは 3 節に戻ってください。
+--
+--   ON         検索の対象になる本文の列（画面の「検索列」）
+--   ATTRIBUTES 絞り込みに使える列（画面の「属性列」）
+--   TARGET_LAG 元のデータが変わったときにどれだけの遅れまで許すか（画面の「ターゲットラグ」）
+
+/*
+USE ROLE BCAST_ENGINEER_ROLE;
+USE WAREHOUSE BCAST_HANDSON_WH;
+USE SCHEMA BCAST_VIEWING_HANDSON.MART;
+
+CREATE OR REPLACE CORTEX SEARCH SERVICE SVC_PROGRAM_CM_META
+  ON CONTENT
+  ATTRIBUTES DOC_TYPE, DOC_ID, TITLE, GENRE, TIME_SLOT, NETWORK_NAME, ADVERTISER, CATEGORY
+  WAREHOUSE = BCAST_HANDSON_WH
+  TARGET_LAG = '1 hour'
+  COMMENT = '番組の概要文とコマーシャルの素材説明文の検索'
+  AS
+    SELECT DOC_TYPE, DOC_ID, TITLE, GENRE, TIME_SLOT, NETWORK_NAME, ADVERTISER, CATEGORY, CONTENT
+    FROM BCAST_VIEWING_HANDSON.MART.V_PROGRAM_CM_DOCS;
+
+SHOW CORTEX SEARCH SERVICES IN SCHEMA BCAST_VIEWING_HANDSON.MART;
+*/

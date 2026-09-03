@@ -17,13 +17,97 @@
 
 ## 使うファイル
 
-`sql/step4_agent.sql`
+| ファイル | 使い方 |
+|---|---|
+| `sql/step4_agent.sql` | 確認と権限付与。末尾に SQL で一気に作る保険がある |
+| [`docs/step4_ref_agent_texts.md`](step4_ref_agent_texts.md) | 画面に貼り付ける文章（コピペ用） |
 
-ワークスペースの左側の一覧から `sql` フォルダを開き、このファイルを選んで上から順に実行します。コピーと貼り付けは必要ありません。
+この章では、エージェントを **Snowsight の画面で作ります**。どんな項目があって、どこに何を書くのかを目で見てもらうためです。長い文章はコピペ用のファイルから写します。間に合わなかった人は、SQL ファイル末尾の保険を実行すれば同じものができます。
 
-## 設定の書き方
+```text
+① 画面でエージェントを作る          ← このページの表 + step4_ref_agent_texts.md
+② sql/step4_agent.sql を上から実行  ← 確認、権限、CoWork の確認
+③ 質問してみる                      ← このページの「質問の例」
+```
 
-設定の中身は YAML です。囲みには `$` を 2 つ並べた記号を使います。名前を付けた囲み（`$spec$` のような書き方）は Snowflake では使えません。
+## 画面でエージェントを作る
+
+```text
+Snowsight → 左メニュー AI と ML → Agents
+ → 右上の Create agent
+```
+
+画面右上のロールが `ACCOUNTADMIN` になっていることを確認してから進めます。画面の項目名は英語表示の場合を括弧で添えています。
+
+### 基本設定（About）
+
+| 項目 | 値 |
+|---|---|
+| データベースとスキーマ | `BCAST_VIEWING_HANDSON` / `MART` |
+| エージェントオブジェクト名 | `BCAST_VIEWING_AGENT` |
+| 表示名（Display name） | `放送視聴データ分析` |
+| 説明（Description） | コピペ用 → **1. 基本設定** |
+| 質問の例（Example questions） | コピペ用 → **1. 基本設定**の 5 つを 1 つずつ |
+
+→ **Create** をクリックするとエージェントの編集画面に入ります。以降は左のタブを順に埋めます。
+
+### 道具 1（Tools → Cortex Analyst → + Add）
+
+| 項目 | 値 |
+|---|---|
+| セマンティックビュー | `BCAST_VIEWING_HANDSON.MART.SV_BROADCAST_VIEWING` |
+| 名前（Name） | `ViewingMetrics` |
+| 説明（Description） | コピペ用 → **2. 道具 1** |
+| ウェアハウス | `BCAST_HANDSON_WH` |
+| クエリタイムアウト | `120` |
+
+→ **Add** をクリック
+
+### 道具 2（Tools → Cortex Search → + Add）
+
+| 項目 | 値 |
+|---|---|
+| 検索サービス | `BCAST_VIEWING_HANDSON.MART.SVC_PROGRAM_CM_META` |
+| 名前（Name） | `ProgramCmSearch` |
+| 説明（Description） | コピペ用 → **3. 道具 2** |
+| ID 列（ID column） | `DOC_ID` |
+| タイトル列（Title column） | `TITLE` |
+| 最大結果数（Max results） | `5` |
+| フィルター | 追加しない |
+
+→ **Add** をクリック
+
+グラフを描かせたい場合は、同じ Tools の画面で **Data to chart** も追加しておきます（既定で入っている場合はそのまま）。
+
+### オーケストレーション（Orchestration）
+
+| 項目 | 値 |
+|---|---|
+| モデル（Model） | `Auto`（既定のまま） |
+| 道具の使い分けの指示（Orchestration instructions） | コピペ用 → **4. オーケストレーション** |
+| 答え方の指示（Response instructions） | コピペ用 → **4. オーケストレーション** |
+
+`Auto` にしておくと、そのアカウントで使える中からいちばん品質の高いモデルが自動で選ばれます。新しいモデルが出たときに自動で切り替わるので、特に理由がなければこのままが手がかかりません。
+
+### アクセス（Access）
+
+| 項目 | 値 |
+|---|---|
+| ロール | `BCAST_ANALYST_ROLE`と`BCAST_ENGINEER_ROLE` を追加 |
+
+→ 右上の **Save** をクリック
+
+ここで追加するロールは、SQL の `GRANT USAGE ON AGENT` と同じ意味です。あとで `sql/step4_agent.sql` の 2 節でも同じ GRANT を実行しますが、二重になっても問題ありません。
+
+### できたことを確認する
+
+ワークスペースに戻り、`sql/step4_agent.sql` を上から実行します。最初の `SHOW AGENTS` で 1 行返れば成功です。
+
+### 画面が間に合わないとき
+
+`sql/step4_agent.sql` の末尾に「保険：UI を使わず SQL で一気に作成する場合はこちら」があります。`/* */` の中の SQL だけを選んで実行します。画面で入力する値と完全に同じ内容です。
+
+設定の中身は YAML です。囲みには `$` を 2 つ並べた記号を使います。
 
 ```sql
 CREATE OR REPLACE AGENT BCAST_VIEWING_AGENT
@@ -50,7 +134,16 @@ tool_resources:
 $$;
 ```
 
-`models` を省略すると、そのアカウントで使える中からいちばん品質の高いモデルが自動で選ばれます。新しいモデルが出たときに自動で切り替わるので、特に理由がなければ `auto` のままにしておくのが手がかかりません。
+画面の各タブがこの YAML のどこに対応するかを知っておくと、あとで直すときに便利です。
+
+| 画面 | YAML |
+|---|---|
+| 説明・質問の例 | `COMMENT` / `instructions.sample_questions` |
+| 道具の名前と説明 | `tools[].tool_spec` |
+| 道具の参照先（セマンティックビュー、検索サービス） | `tool_resources` |
+| 使い分けの指示 | `instructions.orchestration` |
+| 答え方の指示 | `instructions.response` |
+| アクセス | `GRANT USAGE ON AGENT` |
 
 ## 精度を決めるのは 2 か所
 
@@ -79,6 +172,8 @@ description: |
 - コマーシャルの接触は、視聴区間とスポット時刻の重なりによる**推定値**だと添えること
 
 エージェントに数字を出させるとき、いちばん怖いのは数字そのものより**読み方の取り違え**です。定義側と指示側の両方に書いておくと、どちらから来ても同じ注意書きが付きます。
+
+画面で作ったあとに直したいときは、同じ Agents の画面でエージェントを開き **Edit** から変更できます。文章を書き換えて Save すればすぐに反映され、作り直す必要はありません。
 
 ## 権限
 
@@ -181,7 +276,7 @@ GRANT USAGE ON SNOWFLAKE INTELLIGENCE <名前> TO ROLE BCAST_ANALYST_ROLE;
 性年代のセグメントごとに、ジャンル別のリーチを教えてください
 ```
 
-「属性が判明しているのは全体の 10 パーセントです」という注意書きが付くはずです。付かない場合は、指示が効いていないということなので、`instructions.response` を見直します。
+「属性が判明しているのは全体の 10 パーセントです」という注意書きが付くはずです。付かない場合は、指示が効いていないということなので、答え方の指示（Response instructions）を見直します。
 
 ### 5. データに無いことを聞く
 
@@ -205,9 +300,9 @@ GRANT USAGE ON SNOWFLAKE INTELLIGENCE <名前> TO ROLE BCAST_ANALYST_ROLE;
 
 | 症状 | 見るところ |
 |---|---|
-| 道具の選び方を間違える | `tools` の `description`。何に使うか、何に使わないかを具体的に書く |
+| 道具の選び方を間違える | 道具の説明（Tools の Description）。何に使うか、何に使わないかを具体的に書く |
 | 指標を取り違える | セマンティックビューの `WITH SYNONYMS`。呼び方の候補を増やす |
-| 注意書きが付かない | `instructions.response` |
+| 注意書きが付かない | 答え方の指示（Response instructions） |
 | 番組名が当たらない | 検索サービスの本文。題名やジャンルも本文に含めているか |
 | そもそも動かない | 既定のロールと既定のウェアハウス |
 

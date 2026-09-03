@@ -77,9 +77,9 @@ GitHub リポジトリ (CSV)
 | 2a | dbt用ウェアハウスをLARGEへ変更 | 1 分 | [docs/step2_dbt.md](docs/step2_dbt.md) | [sql/step2a_dbt_scale_up.sql](sql/step2a_dbt_scale_up.sql) |
 | 2 | dbt でデータを変換する | 38 分 | [docs/step2_dbt.md](docs/step2_dbt.md) | Snowsightのdbt UIと`dbt/`のモデル |
 | 2b | ウェアハウスをXSMALLへ戻す | 1 分 | [docs/step2_dbt.md](docs/step2_dbt.md) | [sql/step2b_dbt_scale_down.sql](sql/step2b_dbt_scale_down.sql) |
-| 3a | セマンティックビューと検索サービス | 20 分 | [docs/step3a_semantic.md](docs/step3a_semantic.md) | [sql/step3a_semantic.sql](sql/step3a_semantic.sql) |
+| 3a | セマンティックビューと検索サービス | 20 分 | [docs/step3a_semantic.md](docs/step3a_semantic.md) | [sql/step3a_semantic.sql](sql/step3a_semantic.sql) ＋ 検索サービスは画面で作成 |
 | 3b | AI 関数でテキストを数字の隣に並べる（補足） | 12 分 | [docs/step3b_ai.md](docs/step3b_ai.md) | [sql/step3b_ai_functions.sql](sql/step3b_ai_functions.sql) |
-| 4 | エージェントを作り自然言語で分析する | 20 分 | [docs/step4_cowork.md](docs/step4_cowork.md) | [sql/step4_agent.sql](sql/step4_agent.sql) |
+| 4 | エージェントを作り自然言語で分析する | 20 分 | [docs/step4_cowork.md](docs/step4_cowork.md) | 画面で作成（貼り付ける文章は [docs/step4_ref_agent_texts.md](docs/step4_ref_agent_texts.md)）＋ [sql/step4_agent.sql](sql/step4_agent.sql) |
 | 5 | 可視化アプリを作る | 10 分 | [docs/step5_app.md](docs/step5_app.md) | [sql/step5_app.sql](sql/step5_app.sql) |
 | 6 | アクセス権とマスキング | 15 分 | [docs/step6_rbac.md](docs/step6_rbac.md) | [sql/step6_rbac.sql](sql/step6_rbac.sql) |
 | 任意 | データシェアを2 人で試す | 10 分 | [docs/step6_rbac.md](docs/step6_rbac.md) の 4 節 | [sql/step6_rbac.sql](sql/step6_rbac.sql) のコメント部分 |
@@ -88,9 +88,11 @@ GitHub リポジトリ (CSV)
 
 ## 進め方
 
-**コピーと貼り付けは第 0 章だけです。**
+**コピーと貼り付けは、第 0 章と、画面で作る 2 つ（検索サービスとエージェント）だけです。**
 
 第 0 章で、教材のリポジトリを Snowsight のワークスペースに取り込みます。以降の章は、左側のファイル一覧から `sql/stepN_*.sql` を開いて実行するだけです。dbt のモデルもアプリのコードも、同じワークスペースの中にあります。
+
+検索サービス（第 3a 章）とエージェント（第 4 章）は、どんな項目があるかを目で見てもらうために Snowsight の画面で作ります。貼り付ける文章はコピペ用のページにまとめてあり、間に合わない人向けに SQL ファイルの末尾に同じものを一気に作る保険を置いてあります。
 
 ```
 第 0 章  ワークシートに step0_check.sql を貼って実行（ここだけコピペ）
@@ -102,9 +104,9 @@ GitHub リポジトリ (CSV)
 第 2a 章 sql/step2a_dbt_scale_up.sql でLARGEへ変更
 第 2 章  Snowsightのdbt UIで実行・テスト
 第 2b 章 sql/step2b_dbt_scale_down.sql でXSMALLへ戻す
-第 3a 章 ワークスペースで sql/step3a_semantic.sql を開いて実行
+第 3a 章 ワークスペースで sql/step3a_semantic.sql を開いて実行（検索サービスだけ画面で作る）
 第 3b 章 ワークスペースで sql/step3b_ai_functions.sql を開いて実行（補足）
-第 4 章  ワークスペースで sql/step4_agent.sql を開いて実行
+第 4 章  画面でエージェントを作る → sql/step4_agent.sql で確認と権限
 第 5 章  ワークスペースで sql/step5_app.sql を開いて実行
 第 6 章  ワークスペースで sql/step6_rbac.sql を開いて実行
 ```

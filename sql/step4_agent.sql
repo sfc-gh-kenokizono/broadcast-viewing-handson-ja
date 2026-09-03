@@ -1,13 +1,18 @@
 -- =============================================================================
 -- 第 4 章  エージェントを作り自然言語で分析する
 -- =============================================================================
--- 実行するロール: BCAST_ENGINEER_ROLE（権限付与の部分だけ ACCOUNTADMIN）
+-- 実行するロール: ACCOUNTADMIN（画面での作成も同じロールで行います）
 -- 所要時間の目安: 20 分
 --
 -- このスクリプトでやること
---   1. エージェントを作る（第 3 章で作った 2 つの部品を道具として持たせる）
+--   1. エージェントを Snowsight の画面で作る（このファイルは確認だけ）
+--      → 手順と貼り付ける文章は docs/step4_cowork.md と docs/step4_ref_agent_texts.md
 --   2. 使えるようにする権限を渡す
---   3. Snowsight の画面と CoWork で試す
+--   3. CoWork の一覧に出るかどうかを確認する
+--   4. 動作確認
+--
+-- 画面で作るのが間に合わない場合は、ファイル末尾の
+-- 「UI を使わず SQL で一気に作成する場合はこちら」を実行してください。
 --
 -- エージェントは自分でデータを持ちません。持っているのは
 --   ・セマンティックビュー（数値の集計ができる）
@@ -16,19 +21,116 @@
 -- あるいは両方を順番に使うかを決めて動きます。
 -- =============================================================================
 
-USE ROLE BCAST_ENGINEER_ROLE;
+USE ROLE ACCOUNTADMIN;
 USE WAREHOUSE BCAST_HANDSON_WH;
 USE SCHEMA BCAST_VIEWING_HANDSON.MART;
 
 -- =============================================================================
--- 1. エージェントを作る
+-- 1. エージェントを画面で作る
 -- =============================================================================
--- 設定の中身は YAML で書きます。囲みには $ を 2 つ並べた記号を使います。
--- 名前を付けた囲み（$spec$ のような書き方）は Snowflake では使えません。
+-- 【ここで画面操作】
+--   左メニュー AI と ML → Agents → 右上の Create agent
+--   入力する値と貼り付ける文章は docs/step4_cowork.md の表に沿って進めます。
+--   長い文章（説明、指示）は docs/step4_ref_agent_texts.md からコピーします。
 --
--- models を省略すると、そのアカウントで使える中からいちばん品質の高い
--- モデルが自動で選ばれます。新しいモデルが出たときに自動で切り替わるので、
--- 特に理由がなければ auto のままにしておくのが無駄がありません。
+--   作るもの
+--     オブジェクト名   BCAST_VIEWING_AGENT（BCAST_VIEWING_HANDSON.MART）
+--     表示名           放送視聴データ分析
+--     道具 1           Cortex Analyst  → SV_BROADCAST_VIEWING   名前 ViewingMetrics
+--     道具 2           Cortex Search   → SVC_PROGRAM_CM_META    名前 ProgramCmSearch
+--
+-- 作成が終わったら、次で 1 行返ることを確認してから 2 節へ進みます。
+SHOW AGENTS IN SCHEMA BCAST_VIEWING_HANDSON.MART;
+
+-- =============================================================================
+-- 2. 使えるようにする権限を渡す
+-- =============================================================================
+-- エージェントを動かすには 3 つそろっている必要があります。
+--   ・エージェント自体を使う権限
+--   ・エージェントが持つ道具（セマンティックビュー、検索サービス）を使う権限
+--   ・Cortex を使う権限
+-- 第 1 章と第 3 章で 2 つめと 3 つめは渡してあるので、ここでは 1 つめだけです。
+-- 画面の「アクセス」でロールを追加した場合も、この GRANT と同じ意味です。
+-- 二重に実行しても問題ありません。
+
+GRANT USAGE ON AGENT BCAST_VIEWING_HANDSON.MART.BCAST_VIEWING_AGENT TO ROLE BCAST_ANALYST_ROLE;
+GRANT USAGE ON AGENT BCAST_VIEWING_HANDSON.MART.BCAST_VIEWING_AGENT TO ROLE BCAST_ENGINEER_ROLE;
+
+-- ここが引っかかりやすいところです。
+-- CoWork から使うときの権限は、いま画面で選んでいるロールではなく
+-- そのユーザーの既定のロールで判定されます。既定のロールと既定のウェアハウスが
+-- 設定されていないと、画面のロールを切り替えても動きません。
+--
+-- 自分の設定を確認する
+-- 既定のロールと既定のウェアハウスはユーザーの属性なので、
+-- SHOW USERS の結果から自分の行を取り出して見ます。
+SET my_user = (SELECT CURRENT_USER());
+SELECT $my_user AS "変数の中身";
+SHOW USERS;
+SELECT
+  "name"              AS "ユーザー",
+  "default_role"      AS "既定のロール",
+  "default_warehouse" AS "既定のウェアハウス"
+FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))
+WHERE "name" = $my_user;
+
+-- 空になっている場合は次のように指定します。
+-- ALTER USER IDENTIFIER($my_user) SET DEFAULT_ROLE = 'BCAST_ENGINEER_ROLE';
+-- ALTER USER IDENTIFIER($my_user) SET DEFAULT_WAREHOUSE = 'BCAST_HANDSON_WH';
+
+-- =============================================================================
+-- 3. CoWork の一覧に出るかどうかを確認する
+-- =============================================================================
+-- ほとんどのアカウントでは、エージェントを作ると CoWork に自動で出てきます。
+-- ただし、以前から Snowflake Intelligence のオブジェクトが作られている
+-- アカウントでは、そこに明示的に追加する必要があります。
+--
+-- まず、そのオブジェクトがあるかどうかを見ます。
+
+SHOW SNOWFLAKE INTELLIGENCES;
+
+-- 行が返ってきた場合だけ、次を実行します（<名前> は上の結果に置き換えてください）。
+-- 行が返ってこなければ何もする必要はありません。
+--
+-- ALTER SNOWFLAKE INTELLIGENCE <名前>
+--   ADD AGENT BCAST_VIEWING_HANDSON.MART.BCAST_VIEWING_AGENT;
+-- GRANT USAGE ON SNOWFLAKE INTELLIGENCE <名前> TO ROLE BCAST_ANALYST_ROLE;
+
+-- =============================================================================
+-- 4. 動作確認
+-- =============================================================================
+
+-- 作られた中身の確認。画面で入力した説明や指示がここに入っています。
+DESCRIBE AGENT BCAST_VIEWING_HANDSON.MART.BCAST_VIEWING_AGENT;
+
+-- ここから先は画面で操作します。
+--   Snowsight の左メニューから AI と ML、Agents を開き、
+--   放送視聴データ分析 を選んで、画面下の入力欄に質問を打ちます。
+--
+--   CoWork で試す場合は https://ai.snowflake.com を開きます。
+--
+-- 質問の例は docs/step4_cowork.md にまとめています。
+
+-- =============================================================================
+-- 第 4 章はここまでです。第 5 章（可視化アプリ）は docs/step5_app.md へ。
+-- =============================================================================
+
+
+-- =============================================================================
+-- 保険：UI を使わず SQL で一気に作成する場合はこちら
+-- =============================================================================
+-- 画面での作成が間に合わないときや、もう一度作り直したいときに使います。
+-- 画面で入力する値・貼り付ける文章と完全に同じ内容です。
+-- /* */ の中だけを選んで実行し、終わったら 2 節に戻ってください。
+--
+-- 設定の中身は YAML です。囲みには $ を 2 つ並べた記号を使います。
+-- models を auto にすると、そのアカウントで使える中からいちばん品質の高い
+-- モデルが自動で選ばれます。
+
+/*
+USE ROLE ACCOUNTADMIN;
+USE WAREHOUSE BCAST_HANDSON_WH;
+USE SCHEMA BCAST_VIEWING_HANDSON.MART;
 
 CREATE OR REPLACE AGENT BCAST_VIEWING_AGENT
   COMMENT = '地上波 5 局の非特定視聴データについて、自然言語で質問に答えるエージェント'
@@ -168,78 +270,5 @@ tool_resources:
         filterable: true
 $$;
 
--- =============================================================================
--- 2. 使えるようにする権限を渡す
--- =============================================================================
--- エージェントを動かすには 3 つそろっている必要があります。
---   ・エージェント自体を使う権限
---   ・エージェントが持つ道具（セマンティックビュー、検索サービス）を使う権限
---   ・Cortex を使う権限
--- 第 1 章と第 3 章で 2 つめと 3 つめは渡してあるので、ここでは 1 つめだけです。
-
-USE ROLE ACCOUNTADMIN;
-
-GRANT USAGE ON AGENT BCAST_VIEWING_HANDSON.MART.BCAST_VIEWING_AGENT TO ROLE BCAST_ANALYST_ROLE;
-GRANT USAGE ON AGENT BCAST_VIEWING_HANDSON.MART.BCAST_VIEWING_AGENT TO ROLE BCAST_ENGINEER_ROLE;
-
--- ここが引っかかりやすいところです。
--- CoWork から使うときの権限は、いま画面で選んでいるロールではなく
--- そのユーザーの既定のロールで判定されます。既定のロールと既定のウェアハウスが
--- 設定されていないと、画面のロールを切り替えても動きません。
---
--- 自分の設定を確認する
--- 既定のロールと既定のウェアハウスはユーザーの属性なので、
--- SHOW USERS の結果から自分の行を取り出して見ます。
-SET my_user = (SELECT CURRENT_USER());
-SELECT $my_user AS "変数の中身";
-SHOW USERS;
-SELECT
-  "name"              AS "ユーザー",
-  "default_role"      AS "既定のロール",
-  "default_warehouse" AS "既定のウェアハウス"
-FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))
-WHERE "name" = $my_user;
-
--- 空になっている場合は次のように指定します。
--- ALTER USER IDENTIFIER($my_user) SET DEFAULT_ROLE = 'BCAST_ENGINEER_ROLE';
--- ALTER USER IDENTIFIER($my_user) SET DEFAULT_WAREHOUSE = 'BCAST_HANDSON_WH';
-
--- =============================================================================
--- 3. CoWork の一覧に出るかどうかを確認する
--- =============================================================================
--- ほとんどのアカウントでは、エージェントを作ると CoWork に自動で出てきます。
--- ただし、以前から Snowflake Intelligence のオブジェクトが作られている
--- アカウントでは、そこに明示的に追加する必要があります。
---
--- まず、そのオブジェクトがあるかどうかを見ます。
-
-SHOW SNOWFLAKE INTELLIGENCES;
-
--- 行が返ってきた場合だけ、次を実行します（<名前> は上の結果に置き換えてください）。
--- 行が返ってこなければ何もする必要はありません。
---
--- ALTER SNOWFLAKE INTELLIGENCE <名前>
---   ADD AGENT BCAST_VIEWING_HANDSON.MART.BCAST_VIEWING_AGENT;
--- GRANT USAGE ON SNOWFLAKE INTELLIGENCE <名前> TO ROLE BCAST_ANALYST_ROLE;
-
--- =============================================================================
--- 4. 動作確認
--- =============================================================================
-
-USE ROLE BCAST_ENGINEER_ROLE;
-
--- 作られたことの確認
 SHOW AGENTS IN SCHEMA BCAST_VIEWING_HANDSON.MART;
-DESCRIBE AGENT BCAST_VIEWING_HANDSON.MART.BCAST_VIEWING_AGENT;
-
--- ここから先は画面で操作します。
---   Snowsight の左メニューから AI と ML、Agents を開き、
---   放送視聴データ分析 を選んで、画面下の入力欄に質問を打ちます。
---
---   CoWork で試す場合は https://ai.snowflake.com を開きます。
---
--- 質問の例は docs/step4_cowork.md にまとめています。
-
--- =============================================================================
--- 第 4 章はここまでです。第 5 章（可視化アプリ）は docs/step5_app.md へ。
--- =============================================================================
+*/
