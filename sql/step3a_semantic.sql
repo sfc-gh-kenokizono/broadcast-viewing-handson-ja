@@ -4,6 +4,9 @@
 -- 実行するロール: BCAST_ENGINEER_ROLE
 -- 所要時間の目安: 20 分
 --
+-- このファイルは「すべて実行」しないでください。
+-- 2 節の【ここで画面操作】の手前まで実行し、画面で検索サービスを作ってから続きを実行します。
+--
 -- このスクリプトでやること
 --   1. マート層の上にセマンティックビューを作る（指標の定義を Snowflake 側に置く）
 --   2. 番組とコマーシャルの説明文をひとつのビューにまとめる（検索の材料）
@@ -288,9 +291,11 @@ GRANT SELECT, REFERENCES ON SEMANTIC VIEW BCAST_VIEWING_HANDSON.MART.SV_BROADCAS
 GRANT USAGE ON CORTEX SEARCH SERVICE BCAST_VIEWING_HANDSON.MART.SVC_PROGRAM_CM_META
   TO ROLE BCAST_ANALYST_ROLE;
 
--- エンジニアのロールにも明示的に渡しておく（作成者なので実際には不要ですが、
--- 権限の関係を分かりやすくするために書いています）
+-- エンジニアのロールにも渡しておきます。検索サービスは画面で ACCOUNTADMIN が作ったので、
+-- この GRANT がないと次の 4 節（エンジニアロールでの検索）が止まります。
 GRANT SELECT, REFERENCES ON SEMANTIC VIEW BCAST_VIEWING_HANDSON.MART.SV_BROADCAST_VIEWING
+  TO ROLE BCAST_ENGINEER_ROLE;
+GRANT USAGE ON CORTEX SEARCH SERVICE BCAST_VIEWING_HANDSON.MART.SVC_PROGRAM_CM_META
   TO ROLE BCAST_ENGINEER_ROLE;
 
 -- =============================================================================

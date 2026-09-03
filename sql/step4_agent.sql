@@ -4,6 +4,9 @@
 -- 実行するロール: ACCOUNTADMIN（画面での作成も同じロールで行います）
 -- 所要時間の目安: 20 分
 --
+-- このファイルは、画面でエージェントを作った「あと」に実行します。
+-- 作る前に実行すると、2 節以降がエラーになります。
+--
 -- このスクリプトでやること
 --   1. エージェントを Snowsight の画面で作る（このファイルは確認だけ）
 --      → 手順と貼り付ける文章は docs/step4_cowork.md と docs/step4_ref_agent_texts.md
@@ -229,7 +232,7 @@ tool_resources:
 
   ProgramCmSearch:
     search_service: "BCAST_VIEWING_HANDSON.MART.SVC_PROGRAM_CM_META"
-    max_results: "5"
+    max_results: 5
     id_column: "DOC_ID"
     title_column: "TITLE"
     columns_and_descriptions:

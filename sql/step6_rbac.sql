@@ -297,6 +297,8 @@ GRANT IMPORTED PRIVILEGES ON DATABASE BCAST_FROM_PARTNER TO ROLE BCAST_ANALYST_R
 -- ---------------------------------------------------------------------------
 --   ・4-1 でデータは 1 バイトも移動していません。🅱 が読むときも 🅰 のストレージを
 --     直接読んでいます。🅰 が dbt を再実行すれば 🅱 にもそのまま反映されます
+--     （ただし dbt はテーブルを作り直すので、再実行のあとは 4-1 の
+--       GRANT SELECT ON ALL TABLES IN SCHEMA ... TO SHARE をもう一度流します）
 --   ・🅱 側では BCAST_VIEWING_HANDSON（自分の）と BCAST_FROM_PARTNER（相手の）が
 --     並びます。同じ名前でも受け取る側で付け直せるので衝突しません
 --   ・局 → 基盤（各局が視聴ログを共有する）、基盤 → 広告会社（マートだけを共有する）の

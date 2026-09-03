@@ -105,7 +105,7 @@ Snowsight → 左メニュー AI と ML → Agents
 
 ### 画面が間に合わないとき
 
-`sql/step4_agent.sql` の末尾に「保険：UI を使わず SQL で一気に作成する場合はこちら」があります。`/* */` の中の SQL だけを選んで実行します。画面で入力する値と完全に同じ内容です。
+`sql/step4_agent.sql` の末尾に「保険：UI を使わず SQL で一気に作成する場合はこちら」があります。`/* */` の中の SQL だけを選んで実行します。画面で入力する値と同じ名前・同じ道具・同じ指示文です（SQL 側には、検索結果の列の説明が少し多く入っています）。
 
 設定の中身は YAML です。囲みには `$` を 2 つ並べた記号を使います。
 
@@ -164,7 +164,7 @@ description: |
 
 ### 2. 答え方の指示
 
-データの読み方を間違えないようにする決まりを、ここに書いておきます。このハンズオンでは次の 4 つを入れています。
+データの読み方を間違えないようにする決まりを、ここに書いておきます。このハンズオンでは次のような決まりを入れています。
 
 - リーチは重複を除いた台数なので、日別の値を足し合わせないこと
 - 性年代の集計を返すときは、属性が判明しているのは全体の 10 パーセントだと添えること
@@ -190,14 +190,18 @@ description: |
 CoWork から使うときの権限は、**画面で選んでいるロールではなく、そのユーザーの既定のロール**で判定されます。既定のロールと既定のウェアハウスが設定されていないと、画面でロールを切り替えても動きません。
 
 ```sql
-SHOW PARAMETERS LIKE 'DEFAULT%' FOR USER IDENTIFIER(CURRENT_USER());
+SET my_user = (SELECT CURRENT_USER());
+SHOW USERS;
+SELECT "name", "default_role", "default_warehouse"
+FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))
+WHERE "name" = $my_user;
 ```
 
 空になっている場合は設定してください。
 
 ```sql
-ALTER USER IDENTIFIER(CURRENT_USER()) SET DEFAULT_ROLE = 'BCAST_ENGINEER_ROLE';
-ALTER USER IDENTIFIER(CURRENT_USER()) SET DEFAULT_WAREHOUSE = 'BCAST_HANDSON_WH';
+ALTER USER IDENTIFIER($my_user) SET DEFAULT_ROLE = 'BCAST_ENGINEER_ROLE';
+ALTER USER IDENTIFIER($my_user) SET DEFAULT_WAREHOUSE = 'BCAST_HANDSON_WH';
 ```
 
 ## CoWork の一覧に出ない場合

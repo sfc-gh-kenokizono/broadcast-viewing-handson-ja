@@ -407,7 +407,7 @@ with tab5:
                 alt.Chart(programs_on_day)
                 .mark_rule(color=GREY, strokeDash=[4, 4])
                 .encode(
-                    x=alt.X("PROGRAM_AIR_FROM:T"),
+                    x=alt.X("PROGRAM_AIR_FROM:T", title="時刻"),
                     tooltip=[alt.Tooltip("PROGRAM_NAME:N", title="番組"),
                              alt.Tooltip("PROGRAM_AIR_FROM:T", title="開始", format="%H:%M"),
                              alt.Tooltip("PROGRAM_AIR_TO:T", title="終了", format="%H:%M")],
